@@ -103,7 +103,7 @@ const EmailGenerator = () => {
   const [formData, setFormData] = useState({
     leadName: '',
     company: '',
-    product: 'SalesMind AI Platform',
+    product: 'PipelineIQ Platform',
     tone: 'Professional',
     industry: '',
     senderName: user?.name || '',
@@ -121,14 +121,14 @@ const EmailGenerator = () => {
       id: '1',
       name: 'Follow-up after Demo',
       subject: 'Great speaking with you! Next steps for {company}',
-      body: 'Hi {name},\n\nIt was great demonstrating SalesMind AI to you today. Based on our conversation, I think we can definitely help {company} achieve your goals...',
+      body: 'Hi {name},\n\nIt was great demonstrating PipelineIQ to you today. Based on our conversation, I think we can definitely help {company} achieve your goals...',
       category: 'follow-up',
       usageCount: 24,
       successRate: 78,
     },
     {
       id: '2',
-      name: 'Intro to SalesMind',
+      name: 'Intro to PipelineIQ',
       subject: 'Helping {company} close more deals with AI',
       body: 'Hi {name},\n\nI noticed that {company} is doing amazing things in the {industry} space. I wanted to introduce myself...',
       category: 'intro',
@@ -429,7 +429,7 @@ const EmailGenerator = () => {
                     <Input
                       value={formData.product}
                       onChange={(e) => setFormData({ ...formData, product: e.target.value })}
-                      placeholder="e.g. SalesMind AI"
+                      placeholder="e.g. PipelineIQ"
                     />
                   </div>
                 </div>
