@@ -103,7 +103,7 @@ const Copilot = () => {
     {
       id: '1',
       role: 'assistant',
-      content: "Hello! I'm your SalesMind AI Copilot. I can help you analyze leads, prepare for meetings, draft emails, and optimize your sales strategy. What would you like assistance with today?",
+      content: "Hello! I'm your PipelineIQ AI Copilot. I can help you analyze leads, prepare for meetings, draft emails, and optimize your sales strategy. What would you like assistance with today?",
       timestamp: new Date(),
       suggestions: [
         "Analyze my top leads",
@@ -446,7 +446,7 @@ const Copilot = () => {
             Your intelligent sales assistant, ready 24/7
           </p>
         </div>
-        <Badge variant="gradient" className="animate-pulse-slow">
+        <Badge className="bg-gradient-to-r from-purple-600 to-indigo-500 text-white animate-pulse-slow">
           <Sparkles className="w-3 h-3 mr-1" />
           AI Active
         </Badge>
@@ -462,7 +462,7 @@ const Copilot = () => {
                 <Bot className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h2 className="font-semibold">SalesMind Copilot</h2>
+                <h2 className="font-semibold">PipelineIQ Copilot</h2>
                 <div className="flex items-center text-xs text-green-600">
                   <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5 animate-pulse" />
                   Online & Ready
