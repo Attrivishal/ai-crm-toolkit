@@ -42,8 +42,8 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
-import { Badge } from '../ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/Avatar";
+import { Badge } from "../ui/Badge";
 import { Button } from '../ui/Button';
 import {
   DropdownMenu,
@@ -52,7 +52,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '../ui/dropdown-menu';
+} from "../ui/DropdownMenu";
 import {
   Sheet,
   SheetContent,
@@ -60,7 +60,7 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from '../ui/sheet';
+} from "../ui/Sheet";
 import {
   Dialog,
   DialogContent,
@@ -68,7 +68,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '../ui/dialog';
+} from "../ui/Dialog";
 import {
   CommandDialog,
   CommandEmpty,
@@ -76,7 +76,7 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from '../ui/command';
+} from "../ui/Command";
 import { Input } from '../ui/Input';
 import { getInitials } from '../../lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';

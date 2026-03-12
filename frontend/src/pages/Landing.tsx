@@ -44,15 +44,15 @@ import {
   Award,
   TrendingDown,
 } from 'lucide-react';
-import { Button } from '../components/ui/button';
-import { Badge } from '../components/ui/badge';
+import { Button } from "../components/ui/Button";
+import { Badge } from "../components/ui/Badge";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '../components/ui/card';
+} from "../components/ui/Card";
 import { motion } from 'framer-motion';
 
 const Landing = () => {

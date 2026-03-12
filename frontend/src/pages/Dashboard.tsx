@@ -44,16 +44,16 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "../components/ui/card";
+} from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
-import { Badge } from "../components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
+import { Badge } from "../components/ui/Badge";
+import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/Avatar";
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
-} from "../components/ui/tabs";
+} from "../components/ui/Tabs";
 import { useAuth } from "../hooks/useAuth";
 import { leadsApi } from "../lib/api";
 import {

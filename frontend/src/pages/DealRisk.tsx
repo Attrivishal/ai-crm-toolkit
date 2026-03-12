@@ -47,24 +47,24 @@ import {
   ShieldX,
 } from 'lucide-react';
 
-import { Button } from '../components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
-import { Input } from '../components/ui/input';
+import { Button } from "../components/ui/Button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/Card";
+import { Badge } from "../components/ui/Badge";
+import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/Avatar";
+import { Input } from "../components/ui/Input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../components/ui/select';
+} from "../components/ui/Select";
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
-} from '../components/ui/tabs';
+} from "../components/ui/Tabs";
 import {
   Dialog,
   DialogContent,
@@ -72,7 +72,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '../components/ui/dialog';
+} from "../components/ui/Dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -80,13 +80,13 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '../components/ui/dropdown-menu';
+} from "../components/ui/DropdownMenu";
 import {
   Alert,
   AlertDescription,
   AlertTitle,
-} from '../components/ui/alert';
-import { Progress } from '../components/ui/progress';
+} from "../components/ui/Alert";
+import { Progress } from "../components/ui/Progress";
 import { useAuth } from '../hooks/useAuth';
 import { aiApi, leadsApi, tasksApi } from '../lib/api';
 import { formatCurrency, formatDate, formatRelativeTime, getInitials } from '../lib/utils';
