@@ -32,13 +32,13 @@ import {
   BarChart3,
 } from 'lucide-react';
 
-import { Button } from "../components/ui/Button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/Card";
-import { Badge } from "../components/ui/Badge";
-import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/Avatar";
-import { Input } from "../components/ui/Input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/Tabs";
-import { Alert, AlertDescription } from "../components/ui/Alert";
+import { Button } from "../components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { Badge } from "../components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
+import { Input } from "../components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { Alert, AlertDescription } from "../components/ui/alert";
 import { useAuth } from '../hooks/useAuth';
 import { aiApi, leadsApi, tasksApi } from '../lib/api';
 import { formatCurrency, formatRelativeTime, getInitials } from '../lib/utils';

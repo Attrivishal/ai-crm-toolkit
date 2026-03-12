@@ -18,10 +18,10 @@ import {
   Loader2,
 } from 'lucide-react';
 
-import { Button } from "../components/ui/Button";
-import { Input } from "../components/ui/Input";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../components/ui/Card";
-import { Alert, AlertDescription } from "../components/ui/Alert";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../components/ui/card";
+import { Alert, AlertDescription } from "../components/ui/alert";
 import { useAuth } from '../hooks/useAuth';
 
 const signupSchema = z.object({

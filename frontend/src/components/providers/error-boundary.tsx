@@ -1,7 +1,7 @@
 import { Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { AlertCircle, RefreshCw, Home } from 'lucide-react';
-import { Button } from '../ui/Button';  // <-- FIXED: changed from ../ui/button
+import { Button } from "../ui/button";  // <-- FIXED: changed from ../ui/button
 
 interface Props {
   children: ReactNode;

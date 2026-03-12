@@ -40,24 +40,24 @@ import {
   Sparkles as SparklesIcon
 } from 'lucide-react';
 
-import { Button } from "../components/ui/Button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/Card";
-import { Input } from "../components/ui/Input";
-import { Badge } from "../components/ui/Badge";
-import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/Avatar";
+import { Button } from "../components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { Input } from "../components/ui/input";
+import { Badge } from "../components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../components/ui/Select";
+} from "../components/ui/select";
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
-} from "../components/ui/Tabs";
+} from "../components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -66,7 +66,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "../components/ui/Dialog";
+} from "../components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -74,8 +74,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "../components/ui/DropdownMenu";
-import { Alert, AlertDescription, AlertTitle } from "../components/ui/Alert";
+} from "../components/ui/dropdown-menu";
+import { Alert, AlertDescription, AlertTitle } from "../components/ui/alert";
 import { useAuth } from '../hooks/useAuth';
 import { aiApi, leadsApi } from '../lib/api';
 import { formatCurrency, formatDate, getInitials } from '../lib/utils';

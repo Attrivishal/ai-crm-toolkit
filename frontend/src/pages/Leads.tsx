@@ -37,11 +37,11 @@ import {
   MessageSquare
 } from 'lucide-react';
 
-import { Button } from '../components/ui/Button';
-import { Input } from "../components/ui/Input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/Card";
-import { Badge } from "../components/ui/Badge";
-import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/Avatar";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { Badge } from "../components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import {
   Table,
   TableBody,
@@ -49,7 +49,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "../components/ui/Table";
+} from "../components/ui/table";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,7 +57,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "../components/ui/DropdownMenu";
+} from "../components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -66,16 +66,16 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "../components/ui/Dialog";
+} from "../components/ui/dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../components/ui/Select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/Tabs";
-import { Alert, AlertDescription, AlertTitle } from "../components/ui/Alert";
+} from "../components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { Alert, AlertDescription, AlertTitle } from "../components/ui/alert";
 import { useAuth } from '../hooks/useAuth';
 import { leadsApi } from '../lib/api';
 import {
