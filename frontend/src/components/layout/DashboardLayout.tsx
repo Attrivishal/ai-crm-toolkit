@@ -77,7 +77,7 @@ import {
   CommandItem,
   CommandList,
 } from '../ui/command';
-import { Input } from '../ui/input';
+import { Input } from '../ui/Input';
 import { getInitials } from '../../lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import NProgress from 'nprogress';
