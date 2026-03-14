@@ -13,16 +13,6 @@ const interactionSchema = new mongoose.Schema({
         required: [true, 'User ID is required'],
         index: true
     },
-    
-    // ===== NEW ORGANIZATION FIELD =====
-    organizationId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Organization',
-        required: [true, 'Organization ID is required'],
-        index: true
-    },
-    // ===================================
-
     type: { 
         type: String, 
         enum: {
@@ -89,9 +79,9 @@ interactionSchema.virtual('formattedDuration').get(function() {
     return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 });
 
-// ===== UPDATED INDEXES =====
-interactionSchema.index({ organizationId: 1, leadId: 1, createdAt: -1 });
-interactionSchema.index({ organizationId: 1, userId: 1, createdAt: -1 });
-interactionSchema.index({ organizationId: 1, type: 1, createdAt: -1 });
+// Indexes
+interactionSchema.index({ leadId: 1, createdAt: -1 });
+interactionSchema.index({ userId: 1, createdAt: -1 });
+interactionSchema.index({ type: 1, createdAt: -1 });
 
 export default mongoose.model('Interaction', interactionSchema);
