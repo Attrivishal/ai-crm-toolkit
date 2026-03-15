@@ -149,11 +149,181 @@ const generateMockProposal = (lead, focusPoints) => {
     };
 };
 
+// Mock chat response generator
+const generateMockChatResponse = (messages, context) => {
+    const lastMessage = messages[messages.length - 1]?.content?.toLowerCase() || '';
+    
+    // Check if user wants to analyze the best deal
+    if (lastMessage.includes('best deal') || lastMessage.includes('top deal') || lastMessage.includes('best lead')) {
+        const bestLead = context.leads.sort((a, b) => (b.value || 0) - (a.value || 0))[0];
+        if (bestLead) {
+            return {
+                message: `🔍 **Analysis for ${bestLead.name}**\n\n` +
+                        `• **Company**: ${bestLead.company}\n` +
+                        `• **Industry**: ${bestLead.industry || 'N/A'}\n` +
+                        `• **Deal Value**: $${(bestLead.value || 0).toLocaleString()}\n` +
+                        `• **Current Stage**: ${bestLead.status}\n` +
+                        `• **Lead Score**: ${bestLead.leadScore || 0}\n` +
+                        `• **Win Probability**: **${bestLead.leadScore || 50}%**\n\n` +
+                        `**Recommendations:**\n` +
+                        `1. Schedule a demo within the next 48 hours\n` +
+                        `2. Prepare a customized proposal highlighting ROI\n` +
+                        `3. Connect them with your technical team for questions\n\n` +
+                        `Would you like me to draft a follow-up email for this lead?`,
+                suggestions: [
+                    `Draft email to ${bestLead.name}`,
+                    `Create task for ${bestLead.name}`,
+                    `Show similar deals`
+                ],
+                actions: [
+                    { label: `Email ${bestLead.name}`, type: 'email', data: bestLead },
+                    { label: `Create Task`, type: 'task', data: bestLead }
+                ]
+            };
+        }
+    }
+    
+    // Check if user is asking to analyze a specific lead
+    const mentionedLead = context.leads.find(l => 
+        lastMessage.includes(l.name.toLowerCase()) || 
+        lastMessage.includes(`analyze ${l.name.toLowerCase()}`) || 
+        lastMessage.includes(`tell me about ${l.name.toLowerCase()}`)
+    );
+    
+    if (mentionedLead) {
+        return {
+            message: `🔍 **Analysis for ${mentionedLead.name}**\n\n` +
+                    `• **Company**: ${mentionedLead.company}\n` +
+                    `• **Industry**: ${mentionedLead.industry || 'N/A'}\n` +
+                    `• **Deal Value**: $${(mentionedLead.value || 0).toLocaleString()}\n` +
+                    `• **Current Stage**: ${mentionedLead.status}\n` +
+                    `• **Lead Score**: ${mentionedLead.leadScore || 0}\n` +
+                    `• **Win Probability**: **${mentionedLead.leadScore || 50}%**\n\n` +
+                    `Based on this data, I recommend focusing on moving this deal to the next stage. Would you like me to draft a follow-up email?`,
+            suggestions: [
+                `Draft email to ${mentionedLead.name}`,
+                `Create task for ${mentionedLead.name}`,
+                `Show similar deals`
+            ],
+            actions: [
+                { label: `Email ${mentionedLead.name}`, type: 'email', data: mentionedLead },
+                { label: `Create Task`, type: 'task', data: mentionedLead }
+            ]
+        };
+    }
+    
+    // Pipeline analysis
+    if (lastMessage.includes('pipeline') || lastMessage.includes('overview')) {
+        const totalValue = context.leads.reduce((sum, l) => sum + (l.value || 0), 0);
+        const sortedLeads = [...context.leads].sort((a, b) => (b.value || 0) - (a.value || 0)).slice(0, 3);
+        
+        return {
+            message: `📈 **Pipeline Analysis**\n\n` +
+                    `Your pipeline currently has **${context.leads.length} deals** worth **$${totalValue.toLocaleString()}**.\n\n` +
+                    `**Top Opportunities:**\n` +
+                    `${sortedLeads.map((l, i) => `${i+1}. **${l.name}** (${l.company}) - $${(l.value || 0).toLocaleString()} | Win Probability: **${l.leadScore || 50}%**`).join('\n')}\n\n` +
+                    `Would you like me to analyze any specific deal in detail?`,
+            suggestions: [
+                `Analyze best deal`,
+                `Show at-risk deals`,
+                `Draft follow-up emails`
+            ],
+            actions: []
+        };
+    }
+    
+    // At-risk deals
+    if (lastMessage.includes('risk') || lastMessage.includes('at-risk')) {
+        const atRiskLeads = context.leads.filter(l => (l.leadScore || 50) < 40).slice(0, 3);
+        if (atRiskLeads.length === 0) {
+            return {
+                message: 'Good news! I don\'t see any high-risk deals in your pipeline right now.',
+                suggestions: ['Show me my best deals', 'Analyze pipeline health'],
+                actions: []
+            };
+        }
+        
+        return {
+            message: `⚠️ **Deals That Need Attention**\n\n` +
+                    `The following deals have a low win probability and may need attention:\n\n` +
+                    `${atRiskLeads.map((l, i) => `• **${l.name}** (${l.company}) - $${(l.value || 0).toLocaleString()} | Win Probability: **${l.leadScore || 50}%**`).join('\n')}\n\n` +
+                    `Would you like me to suggest next steps for these deals?`,
+            suggestions: [
+                `Suggest next steps`,
+                `Draft follow-up email`,
+                `Schedule review meeting`
+            ],
+            actions: atRiskLeads.map(l => ({
+                label: `View ${l.name}`,
+                type: 'lead',
+                data: l
+            }))
+        };
+    }
+    
+    // Email drafting
+    if (lastMessage.includes('email') || lastMessage.includes('draft')) {
+        return {
+            message: 'I can help you draft emails for your leads. Which lead would you like to contact?',
+            suggestions: ['Email top lead', 'Draft follow-up', 'Create sequence'],
+            actions: context.leads.slice(0, 3).map(l => ({
+                label: `Email ${l.name}`,
+                type: 'email',
+                data: l
+            }))
+        };
+    }
+    
+    // Default response
+    return {
+        message: 'I understand you need assistance. Here\'s what I can help you with:\n\n' +
+                 '• 📊 **Pipeline Analysis** - Get insights on your deals\n' +
+                 '• 🎯 **Lead Analysis** - Deep dive into specific leads\n' +
+                 '• 📧 **Email Drafting** - Create personalized outreach emails\n' +
+                 '• ⚠️ **Risk Detection** - Identify at-risk deals\n' +
+                 '• 📈 **Win Probability** - Predict deal success\n\n' +
+                 'What would you like me to help with?',
+        suggestions: [
+            'Analyze my pipeline',
+            'Show high-value deals',
+            'Identify at-risk deals',
+            'Draft an email'
+        ],
+        actions: []
+    };
+};
+
 // Apply authentication to all routes
 router.use(protect);
 
 // REMOVED - OpenAI key check middleware
 // router.use(checkOpenAIKey);
+
+// @route   POST /api/ai/chat
+// @desc    AI chat with CRM context
+// @access  Private
+router.post('/chat', protect, async (req, res) => {
+    try {
+        const { messages, context } = req.body;
+
+        // Generate mock chat response
+        const response = generateMockChatResponse(messages, context);
+
+        res.json({ 
+            success: true, 
+            message: response.message,
+            suggestions: response.suggestions,
+            actions: response.actions 
+        });
+    } catch (error) {
+        console.error('AI Chat Error:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error processing chat request',
+            error: error.message 
+        });
+    }
+});
 
 // @route   POST /api/ai/analyze-lead
 router.post('/analyze-lead', async (req, res) => {

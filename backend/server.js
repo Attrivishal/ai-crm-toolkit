@@ -1,7 +1,9 @@
+import dotenv from 'dotenv';
+dotenv.config();  // ← MUST BE FIRST - Load environment variables before anything else!
+
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import compression from 'compression';
@@ -9,14 +11,14 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import morgan from 'morgan';
 import hpp from 'hpp';
+import passport from 'passport';
 
 import authRoutes from './src/routes/auth.js';
 import leadRoutes from './src/routes/leads.js';
 import aiRoutes from './src/routes/ai.js';
 import taskRoutes from './src/routes/tasks.js';
 import interactionRoutes from './src/routes/interactions.js';
-
-dotenv.config();
+import './src/config/passport.js'; // This now has access to process.env
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -177,6 +179,11 @@ app.use('/api', globalLimiter);
 app.use('/api/auth', authLimiter);
 app.use('/api/ai', aiLimiter);
 
+// ==================== PASSPORT INITIALIZATION ====================
+
+// Initialize Passport for OAuth
+app.use(passport.initialize());
+
 // ==================== DATABASE CONNECTION ====================
 
 const connectDB = async () => {
@@ -264,7 +271,9 @@ app.get('/api/health', (req, res) => {
             models: Object.keys(mongoose.models).length
         },
         services: {
-            ai: process.env.OPENAI_API_KEY ? 'configured' : 'not configured'
+            ai: process.env.OPENAI_API_KEY ? 'configured' : 'not configured',
+            googleOAuth: process.env.GOOGLE_CLIENT_ID ? 'configured' : 'not configured',
+            githubOAuth: process.env.GITHUB_CLIENT_ID ? 'configured' : 'not configured'
         }
     });
 });
@@ -325,7 +334,9 @@ app.get('/', (req, res) => {
                 login: 'POST /api/auth/login',
                 refresh: 'POST /api/auth/refresh',
                 logout: 'POST /api/auth/logout',
-                me: 'GET /api/auth/me'
+                me: 'GET /api/auth/me',
+                google: 'GET /api/auth/google',
+                github: 'GET /api/auth/github'
             },
             leads: {
                 list: 'GET /api/leads',
@@ -518,6 +529,7 @@ const server = app.listen(PORT, () => {
     console.log(`🚀 Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`🚀 Client URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
     console.log(`🚀 Health check: http://localhost:${PORT}/api/health`);
+    console.log(`🚀 OAuth: Google ${process.env.GOOGLE_CLIENT_ID ? '✅' : '❌'} | GitHub ${process.env.GITHUB_CLIENT_ID ? '✅' : '❌'}`);
     console.log(`🚀 ==================================\n`);
 });
 
