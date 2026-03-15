@@ -1,6 +1,7 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import jwt from 'jsonwebtoken';
+import passport from 'passport';
 import User from '../models/User.js';
 import RefreshToken from '../models/RefreshToken.js';
 import { protect } from '../middleware/auth.js';
@@ -40,7 +41,103 @@ const generateTokens = async (userId, userAgent, ipAddress) => {
     return { accessToken, refreshToken };
 };
 
+// ==================== GOOGLE OAUTH ROUTES ====================
+
+// @route   GET /api/auth/google
+// @desc    Initiate Google OAuth
+// @access  Public
+router.get('/google', (req, res, next) => {
+    const returnUrl = req.query.returnUrl || '/dashboard';
+    const authenticator = passport.authenticate('google', { 
+        scope: ['profile', 'email'],
+        state: returnUrl
+    });
+    authenticator(req, res, next);
+});
+
+// @route   GET /api/auth/google/callback
+// @desc    Google OAuth callback
+// @access  Public
+router.get('/google/callback', 
+    passport.authenticate('google', { 
+        session: false, 
+        failureRedirect: `${process.env.CLIENT_URL}/login?error=google_auth_failed` 
+    }),
+    async (req, res) => {
+        try {
+            const { user } = req.user;
+            const returnUrl = req.query.state || '/dashboard';
+            
+            // Generate tokens for the user
+            const { accessToken, refreshToken } = await generateTokens(
+                user._id,
+                req.headers['user-agent'],
+                req.ip
+            );
+
+            // Update last login
+            await user.updateLastLogin();
+
+            // Redirect to frontend with tokens
+            res.redirect(`${process.env.CLIENT_URL}${returnUrl}?token=${accessToken}&refreshToken=${refreshToken}`);
+        } catch (error) {
+            console.error('Google callback error:', error);
+            res.redirect(`${process.env.CLIENT_URL}/login?error=auth_failed`);
+        }
+    }
+);
+
+// ==================== GITHUB OAUTH ROUTES ====================
+
+// @route   GET /api/auth/github
+// @desc    Initiate GitHub OAuth
+// @access  Public
+router.get('/github', (req, res, next) => {
+    const returnUrl = req.query.returnUrl || '/dashboard';
+    const authenticator = passport.authenticate('github', { 
+        scope: ['user:email'],
+        state: returnUrl
+    });
+    authenticator(req, res, next);
+});
+
+// @route   GET /api/auth/github/callback
+// @desc    GitHub OAuth callback
+// @access  Public
+router.get('/github/callback', 
+    passport.authenticate('github', { 
+        session: false, 
+        failureRedirect: `${process.env.CLIENT_URL}/login?error=github_auth_failed` 
+    }),
+    async (req, res) => {
+        try {
+            const { user } = req.user;
+            const returnUrl = req.query.state || '/dashboard';
+            
+            // Generate tokens for the user
+            const { accessToken, refreshToken } = await generateTokens(
+                user._id,
+                req.headers['user-agent'],
+                req.ip
+            );
+
+            // Update last login
+            await user.updateLastLogin();
+
+            // Redirect to frontend with tokens
+            res.redirect(`${process.env.CLIENT_URL}${returnUrl}?token=${accessToken}&refreshToken=${refreshToken}`);
+        } catch (error) {
+            console.error('GitHub callback error:', error);
+            res.redirect(`${process.env.CLIENT_URL}/login?error=auth_failed`);
+        }
+    }
+);
+
+// ==================== EMAIL/PASSWORD ROUTES ====================
+
 // @route   POST /api/auth/register
+// @desc    Register a new user
+// @access  Public
 router.post('/register', [
     body('name', 'Name is required')
         .not().isEmpty()
@@ -125,10 +222,10 @@ router.post('/register', [
         });
     } catch (error) {
         console.error('🔥 Registration error details:', {
-        message: error.message,
-        stack: error.stack,
-        name: error.name
-    });
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+        });
         res.status(500).json({ 
             success: false,
             message: 'Registration failed. Please try again.' 
@@ -137,6 +234,8 @@ router.post('/register', [
 });
 
 // @route   POST /api/auth/login
+// @desc    Login user
+// @access  Public
 router.post('/login', [
     body('email', 'Please include a valid email')
         .isEmail()
@@ -229,6 +328,8 @@ router.post('/login', [
 });
 
 // @route   POST /api/auth/refresh
+// @desc    Refresh access token
+// @access  Public
 router.post('/refresh', async (req, res) => {
     try {
         const { refreshToken } = req.body;
@@ -325,6 +426,8 @@ router.post('/refresh', async (req, res) => {
 });
 
 // @route   POST /api/auth/logout
+// @desc    Logout user
+// @access  Public
 router.post('/logout', async (req, res) => {
     try {
         const { refreshToken } = req.body;
@@ -354,6 +457,8 @@ router.post('/logout', async (req, res) => {
 });
 
 // @route   POST /api/auth/logout-all
+// @desc    Logout from all devices
+// @access  Private
 router.post('/logout-all', protect, async (req, res) => {
     try {
         // Invalidate all refresh tokens for this user
@@ -379,6 +484,8 @@ router.post('/logout-all', protect, async (req, res) => {
 });
 
 // @route   GET /api/auth/me
+// @desc    Get current user
+// @access  Private
 router.get('/me', protect, async (req, res) => {
     try {
         // Get user with additional stats
@@ -422,6 +529,8 @@ router.get('/me', protect, async (req, res) => {
 });
 
 // @route   PUT /api/auth/me
+// @desc    Update user profile
+// @access  Private
 router.put('/me', protect, [
     body('name')
         .optional()
