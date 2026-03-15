@@ -65,38 +65,6 @@ interface Suggestion {
   color: string;
 }
 
-// Win Probability Calculator
-const getWinProbability = (lead: any) => {
-  let score = 0;
-
-  // Lead score weight
-  score += (lead.leadScore || 0) * 0.5;
-
-  // Deal value weight
-  if (lead.value > 50000) score += 20;
-  else if (lead.value > 20000) score += 10;
-
-  // Stage weight
-  switch (lead.status) {
-    case "Qualified":
-      score += 10;
-      break;
-    case "Demo Scheduled":
-      score += 20;
-      break;
-    case "Proposal Sent":
-      score += 30;
-      break;
-    case "Closed Won":
-      score = 100;
-      break;
-    default:
-      break;
-  }
-
-  return Math.min(Math.round(score), 100);
-};
-
 const Copilot = () => {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([
@@ -125,7 +93,7 @@ const Copilot = () => {
     queryKey: ['leads', 'copilot'],
     queryFn: async () => {
       try {
-        const { data } = await leadsApi.getLeads({ limit: 10 });
+        const { data } = await leadsApi.getLeads({ limit: 50 });
         return data;
       } catch (error) {
         console.error('Failed to fetch leads:', error);
@@ -139,12 +107,28 @@ const Copilot = () => {
     queryKey: ['tasks', 'recent'],
     queryFn: async () => {
       try {
-        const { data } = await tasksApi.getTasks({ limit: 5, status: 'pending' });
+        const { data } = await tasksApi.getTasks({ limit: 10, status: 'pending' });
         return data;
       } catch (error) {
         console.error('Failed to fetch tasks:', error);
         return { tasks: [] };
       }
+    },
+  });
+
+  // AI Chat Completion Mutation
+  const chatMutation = useMutation({
+    mutationFn: async (data: { messages: any[]; context: any }) => {
+      // Call your AI API endpoint that connects to OpenAI/Claude/Llama
+      const response = await fetch('http://localhost:5001/api/ai/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+        },
+        body: JSON.stringify(data),
+      });
+      return response.json();
     },
   });
 
@@ -168,33 +152,6 @@ const Copilot = () => {
     mutationFn: (leadId: string) => aiApi.predictDealRisk(leadId),
   });
 
-  // Add welcome insight when leads load
-  useEffect(() => {
-    if (leadsData?.leads?.length > 0 && messages.length === 1) {
-      const totalLeads = leadsData.leads.length;
-      const avgScore = Math.round(
-        leadsData.leads.reduce((sum: number, l: any) => sum + (l.leadScore || 0), 0) / totalLeads
-      );
-      const totalValue = leadsData.leads.reduce((sum: number, l: any) => sum + (l.value || 0), 0);
-      const highValueLeads = leadsData.leads.filter((l: any) => l.value > 50000).length;
-
-      const insightMessage: Message = {
-        id: 'insight',
-        role: 'assistant',
-        content: `📊 **Quick CRM Insight**\n\nYou currently have **${totalLeads} leads** in your pipeline worth **${formatCurrency(totalValue)}**.\n\n• Average Lead Score: **${avgScore}**\n• High-Value Deals (>$50k): **${highValueLeads}**\n\nI can help you analyze these leads, draft emails, or identify at-risk deals. What would you like to focus on?`,
-        timestamp: new Date(),
-        suggestions: [
-          "Show me my top opportunities",
-          "Analyze high-value leads",
-          "Identify at-risk deals",
-          "Draft follow-up emails",
-        ],
-      };
-
-      setMessages(prev => [...prev, insightMessage]);
-    }
-  }, [leadsData]);
-
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
@@ -204,7 +161,7 @@ const Copilot = () => {
   };
 
   const handleSend = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || isTyping) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -217,149 +174,72 @@ const Copilot = () => {
     setInput('');
     setIsTyping(true);
 
-    // Process with AI
-    setTimeout(async () => {
-      try {
-        const response = await generateAIResponse(input);
-        setMessages(prev => [...prev, response]);
-      } catch (error) {
-        const fallback: Message = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: "I'm having trouble processing that request right now. Please try again.",
-          timestamp: new Date(),
-        };
-        setMessages(prev => [...prev, fallback]);
-      } finally {
-        setIsTyping(false);
-      }
-    }, 1500);
-  };
+    try {
+      // Prepare context from CRM data
+      const context = {
+        user: {
+          name: user?.name,
+          email: user?.email,
+          role: user?.role,
+        },
+        leads: leadsData?.leads?.map((l: any) => ({
+          id: l._id,
+          name: l.name,
+          company: l.company,
+          value: l.value,
+          status: l.status,
+          leadScore: l.leadScore,
+          industry: l.industry,
+          createdAt: l.createdAt,
+          updatedAt: l.updatedAt,
+        })) || [],
+        tasks: tasksData?.tasks?.map((t: any) => ({
+          id: t._id,
+          title: t.title,
+          status: t.status,
+          priority: t.priority,
+          dueDate: t.dueDate,
+        })) || [],
+        stats: {
+          totalLeads: leadsData?.leads?.length || 0,
+          totalValue: leadsData?.leads?.reduce((sum: number, l: any) => sum + (l.value || 0), 0) || 0,
+          pendingTasks: tasksData?.tasks?.length || 0,
+        },
+      };
 
-  const generateAIResponse = async (userInput: string): Promise<Message> => {
-    const input = userInput.toLowerCase();
-    const leads = leadsData?.leads || [];
-    
-    // Check for pipeline/top opportunities intent
-    if (input.includes('pipeline') || input.includes('top') || input.includes('opportunities')) {
-      const sortedLeads = [...leads]
-        .sort((a, b) => (b.leadScore || 0) - (a.leadScore || 0))
-        .slice(0, 3);
-      
-      const totalValue = leads.reduce((sum: number, l: any) => sum + (l.value || 0), 0);
-      
-      return {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: `📈 **Pipeline Analysis**\n\nYour pipeline currently has **${leads.length} deals** worth **${formatCurrency(totalValue)}**.\n\n**Top Opportunities:**\n${sortedLeads.map((l: any, i: number) => 
-          `${i+1}. **${l.name}** (${l.company}) - ${formatCurrency(l.value)} | Win Probability: **${getWinProbability(l)}%**`
-        ).join('\n')}\n\nWould you like me to analyze any specific deal in detail?`,
-        timestamp: new Date(),
-        suggestions: [
-          "Analyze best deal",
-          "Show at-risk deals",
-          "Draft follow-up emails",
-        ],
-      };
-    }
-    
-    // Check for at-risk deals
-    if (input.includes('risk') || input.includes('at-risk') || input.includes('danger')) {
-      const atRiskLeads = leads
-        .filter((l: any) => getWinProbability(l) < 40)
-        .slice(0, 3);
-      
-      if (atRiskLeads.length === 0) {
-        return {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: "Good news! I don't see any high-risk deals in your pipeline right now.",
-          timestamp: new Date(),
-        };
-      }
-      
-      return {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: `⚠️ **Deals That Need Attention**\n\nThe following deals have a low win probability and may need attention:\n\n${atRiskLeads.map((l: any) => 
-          `• **${l.name}** (${l.company}) - ${formatCurrency(l.value)} | Win Probability: **${getWinProbability(l)}%**`
-        ).join('\n')}\n\nWould you like me to suggest next steps for these deals?`,
-        timestamp: new Date(),
-        suggestions: [
-          "Suggest next steps",
-          "Draft follow-up email",
-          "Schedule review meeting",
-        ],
-      };
-    }
-    
-    // Check for lead analysis
-    if (input.includes('analyze') && (input.includes('lead') || input.includes('deal'))) {
-      if (selectedLead) {
-        return {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: `🔍 **Analysis for ${selectedLead.name}**\n\n• Company: ${selectedLead.company}\n• Industry: ${selectedLead.industry}\n• Deal Value: ${formatCurrency(selectedLead.value || 0)}\n• Current Stage: ${selectedLead.status}\n• Lead Score: ${selectedLead.leadScore}\n• Win Probability: **${getWinProbability(selectedLead)}%**\n\nBased on this data, I recommend focusing on moving this deal to the next stage. Would you like me to draft a follow-up email?`,
-          timestamp: new Date(),
-          actions: [
-            { label: "Draft Follow-up Email", type: 'email', data: selectedLead },
-            { label: "Create Task", type: 'task' },
-          ],
-        };
-      }
-      
-      return {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: "I'd be happy to analyze a lead for you. Please select a lead from the dropdown or specify which lead you'd like me to analyze.",
-        timestamp: new Date(),
-      };
-    }
-    
-    // Check for email generation intent
-    if (input.includes('email') || input.includes('draft') || input.includes('write')) {
-      return {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: "I can help you draft a professional email. Which lead would you like to contact?",
-        timestamp: new Date(),
-        actions: leads?.slice(0, 3).map((lead: any) => ({
-          label: `Email ${lead.name} at ${lead.company}`,
-          type: 'email',
-          data: lead,
+      // Call AI with conversation history and context
+      const response = await chatMutation.mutateAsync({
+        messages: messages.concat(userMessage).map(m => ({
+          role: m.role,
+          content: m.content,
         })),
-      };
-    }
-    
-    // Check for high-value leads
-    if (input.includes('high-value') || input.includes('big deals')) {
-      const highValueLeads = leads
-        .filter((l: any) => l.value > 50000)
-        .sort((a: any, b: any) => (b.value || 0) - (a.value || 0));
-      
-      return {
+        context,
+      });
+
+      const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: `💰 **High-Value Opportunities**\n\n${highValueLeads.map((l: any, i: number) => 
-          `${i+1}. **${l.name}** (${l.company}) - ${formatCurrency(l.value)} | Win Probability: **${getWinProbability(l)}%**`
-        ).join('\n')}`,
+        content: response.message,
+        timestamp: new Date(),
+        suggestions: response.suggestions || [],
+        actions: response.actions || [],
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error('AI Chat error:', error);
+      
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: "I'm having trouble connecting to AI services right now. Please try again in a moment.",
         timestamp: new Date(),
       };
+      
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsTyping(false);
     }
-    
-    // Default response
-    return {
-      id: (Date.now() + 1).toString(),
-      role: 'assistant',
-      content: "I understand you need assistance. Here's what I can help you with:\n\n• 📊 **Pipeline Analysis** - Get insights on your deals\n• 🎯 **Lead Analysis** - Deep dive into specific leads\n• 📧 **Email Drafting** - Create personalized outreach emails\n• ⚠️ **Risk Detection** - Identify at-risk deals\n• 📈 **Win Probability** - Predict deal success\n\nWhat would you like me to help with?",
-      timestamp: new Date(),
-      suggestions: [
-        "Analyze my pipeline",
-        "Show high-value deals",
-        "Identify at-risk deals",
-        "Draft an email",
-      ],
-    };
   };
 
   const handleSuggestionClick = (suggestion: string) => {
@@ -402,7 +282,7 @@ const Copilot = () => {
       title: 'Pipeline Insights',
       description: `Analyze ${leadsData?.leads?.length || 0} active deals`,
       icon: BarChart3,
-      action: 'Show me pipeline insights',
+      action: 'Give me a detailed analysis of my entire sales pipeline',
       color: 'blue',
     },
     {
@@ -410,7 +290,7 @@ const Copilot = () => {
       title: 'High Priority Leads',
       description: `Top ${Math.min(3, leadsData?.leads?.length || 0)} opportunities`,
       icon: Target,
-      action: 'Show high priority leads',
+      action: 'Show me my highest priority leads and recommend next steps',
       color: 'green',
     },
     {
@@ -418,15 +298,15 @@ const Copilot = () => {
       title: 'Follow-ups Needed',
       description: `${tasksData?.tasks?.length || 0} pending tasks`,
       icon: Clock,
-      action: 'Show leads needing follow up',
+      action: 'What follow-up actions should I take today?',
       color: 'purple',
     },
     {
-      id: 'risk',
-      title: 'Deal Risk',
-      description: 'Predict deals that may be lost',
-      icon: AlertCircle,
-      action: 'Show risky deals',
+      id: 'strategy',
+      title: 'Sales Strategy',
+      description: 'Optimize your approach',
+      icon: TrendingUp,
+      action: 'Suggest strategies to improve my win rate',
       color: 'orange',
     },
   ];
@@ -443,7 +323,7 @@ const Copilot = () => {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">AI Copilot</h1>
           <p className="text-muted-foreground mt-1">
-            Your intelligent sales assistant, ready 24/7
+            Your intelligent sales assistant, powered by real-time AI
           </p>
         </div>
         <Badge className="bg-gradient-to-r from-purple-600 to-indigo-500 text-white animate-pulse-slow">
@@ -593,7 +473,7 @@ const Copilot = () => {
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground mt-2 ml-11">
-                    Analyzing CRM data...
+                    AI is thinking...
                   </p>
                 </div>
               </motion.div>
@@ -620,12 +500,13 @@ const Copilot = () => {
                   onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
                   placeholder="Ask me anything about your sales pipeline..."
                   className="pr-24"
+                  disabled={isTyping}
                 />
                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center space-x-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" disabled={isTyping}>
                     <Mic className="w-4 h-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" disabled={isTyping}>
                     <Paperclip className="w-4 h-4" />
                   </Button>
                 </div>
@@ -672,9 +553,6 @@ const Copilot = () => {
                         <Badge className={lead.leadScore >= 70 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}>
                           Score: {lead.leadScore}
                         </Badge>
-                        <p className="text-xs font-bold mt-1">
-                          Win: {getWinProbability(lead)}%
-                        </p>
                       </div>
                     </button>
                   ))}
@@ -684,7 +562,7 @@ const Copilot = () => {
 
             <p className="mt-3 text-xs text-center text-muted-foreground">
               <Zap className="w-3 h-3 inline mr-1 text-primary-500" />
-              AI-powered insights • Context-aware responses • Real-time CRM data
+              AI-powered by OpenAI • Real-time CRM data • Smart suggestions
             </p>
           </div>
         </div>
@@ -696,7 +574,7 @@ const Copilot = () => {
             <CardHeader>
               <CardTitle className="text-sm flex items-center">
                 <Zap className="w-4 h-4 mr-2 text-primary-500" />
-                Quick Actions
+                AI Suggestions
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -734,7 +612,7 @@ const Copilot = () => {
             <CardHeader>
               <CardTitle className="text-sm flex items-center">
                 <Briefcase className="w-4 h-4 mr-2 text-primary-500" />
-                Active Context
+                CRM Context
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -753,21 +631,6 @@ const Copilot = () => {
                       <p className="text-sm text-muted-foreground">{selectedLead.company}</p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
-                    <div>
-                      <p className="text-muted-foreground">Value</p>
-                      <p className="font-medium">{formatCurrency(selectedLead.value || 0)}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Win Prob</p>
-                      <p className={`font-medium ${
-                        getWinProbability(selectedLead) >= 70 ? 'text-green-600' :
-                        getWinProbability(selectedLead) >= 40 ? 'text-yellow-600' : 'text-red-600'
-                      }`}>
-                        {getWinProbability(selectedLead)}%
-                      </p>
-                    </div>
-                  </div>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -782,52 +645,18 @@ const Copilot = () => {
                   <Users className="w-12 h-12 text-muted-foreground/50 mx-auto mb-3" />
                   <p className="text-sm text-muted-foreground">No lead selected</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Select a lead from the dropdown to get personalized insights
+                    AI will use all your CRM data for context
                   </p>
-                </div>
-              )}
-
-              {/* Recent Tasks */}
-              {tasksData?.tasks && tasksData.tasks.length > 0 && (
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground mb-2">Pending Tasks</p>
-                  <div className="space-y-2">
-                    {tasksData.tasks.slice(0, 3).map((task: any) => (
-                      <div key={task._id} className="flex items-center justify-between text-sm p-2 hover:bg-muted rounded-lg">
-                        <div className="flex items-center space-x-2">
-                          <Clock className="w-3 h-3 text-muted-foreground" />
-                          <span>{task.title}</span>
-                        </div>
-                        <Badge variant={task.priority === 'High' ? 'destructive' : 'secondary'} size="sm">
-                          {task.priority}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
                 </div>
               )}
 
               {/* Quick Stats */}
               <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2">Today's Activity</p>
+                <p className="text-xs font-medium text-muted-foreground mb-2">Pipeline Summary</p>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="p-2 bg-muted/50 rounded-lg text-center">
-                    <p className="text-lg font-bold">
-                      {Math.floor(Math.random() * 5) + 1}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Meetings</p>
-                  </div>
-                  <div className="p-2 bg-muted/50 rounded-lg text-center">
-                    <p className="text-lg font-bold">
-                      {Math.floor(Math.random() * 8) + 2}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Emails</p>
-                  </div>
-                  <div className="p-2 bg-muted/50 rounded-lg text-center">
-                    <p className="text-lg font-bold">
-                      {tasksData?.tasks?.length || 0}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Tasks</p>
+                    <p className="text-lg font-bold">{leadsData?.leads?.length || 0}</p>
+                    <p className="text-xs text-muted-foreground">Total Leads</p>
                   </div>
                   <div className="p-2 bg-muted/50 rounded-lg text-center">
                     <p className="text-lg font-bold">
@@ -835,47 +664,18 @@ const Copilot = () => {
                         leadsData?.leads?.reduce((sum: number, l: any) => sum + (l.value || 0), 0) || 0
                       )}
                     </p>
-                    <p className="text-xs text-muted-foreground">Pipeline</p>
+                    <p className="text-xs text-muted-foreground">Pipeline Value</p>
                   </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Recent Conversations */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm flex items-center">
-                <MessageSquare className="w-4 h-4 mr-2 text-primary-500" />
-                Recent Conversations
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center space-x-3 p-2 hover:bg-muted rounded-lg cursor-pointer">
-                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <Target className="w-4 h-4 text-blue-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">Pipeline Analysis</p>
-                  <p className="text-xs text-muted-foreground">2 hours ago</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-3 p-2 hover:bg-muted rounded-lg cursor-pointer">
-                <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                  <FileText className="w-4 h-4 text-green-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">Lead Analysis</p>
-                  <p className="text-xs text-muted-foreground">Yesterday</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-3 p-2 hover:bg-muted rounded-lg cursor-pointer">
-                <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <MessageSquare className="w-4 h-4 text-purple-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">Email Draft</p>
-                  <p className="text-xs text-muted-foreground">2 days ago</p>
+                  <div className="p-2 bg-muted/50 rounded-lg text-center">
+                    <p className="text-lg font-bold">
+                      {leadsData?.leads?.filter((l: any) => l.status === 'Proposal Sent').length || 0}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Proposals</p>
+                  </div>
+                  <div className="p-2 bg-muted/50 rounded-lg text-center">
+                    <p className="text-lg font-bold">{tasksData?.tasks?.length || 0}</p>
+                    <p className="text-xs text-muted-foreground">Pending Tasks</p>
+                  </div>
                 </div>
               </div>
             </CardContent>

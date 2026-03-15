@@ -159,6 +159,7 @@ api.interceptors.response.use(
       } catch (refreshError) {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
+        localStorage.removeItem('oauth_redirect'); // Add this line
         window.location.href = '/login';
         return Promise.reject(refreshError);
       }
@@ -196,6 +197,14 @@ export const authApi = {
   
   updateProfile: (data: Partial<User>) => 
     api.put<{ success: boolean; user: User }>('/auth/me', data),
+  
+  // Add this function for OAuth
+  handleOAuthCallback: (token: string, refreshToken?: string) => {
+    localStorage.setItem('accessToken', token);
+    if (refreshToken) {
+      localStorage.setItem('refreshToken', refreshToken);
+    }
+  },
 };
 
 // Leads API
@@ -308,6 +317,24 @@ export const aiApi = {
   
   generateProposal: (data: { leadId: string; template?: string; focusPoints?: string[] }) => 
     api.post('/ai/generate-proposal', data),
+};
+
+// OAuth helper function (optional but useful)
+export const oauthHelper = {
+  // Get OAuth URL for provider
+  getAuthUrl: (provider: 'google' | 'github') => {
+    return `${API_URL}/auth/${provider}`;
+  },
+  
+  // Handle OAuth callback
+  handleCallback: () => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const refreshToken = params.get('refreshToken');
+    const error = params.get('error');
+    
+    return { token, refreshToken, error };
+  },
 };
 
 export default api;
