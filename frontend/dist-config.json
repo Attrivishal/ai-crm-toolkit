@@ -1,0 +1,292 @@
+{
+    "ETag": "E13V1IB3VIYZZH",
+    "DistributionConfig": {
+        "CallerReference": "00931e5f-9c1a-4c1a-88f5-368ec1a5497a",
+        "Aliases": {
+            "Quantity": 0
+        },
+        "DefaultRootObject": "",
+        "Origins": {
+        "Quantity": 3,
+            "Quantity": 2,
+            "Items": [
+                {
+                    "Id": "ec2-backend",
+                    "DomainName": "100.24.243.177",
+                    "OriginPath": "",
+                    "CustomHeaders": {"Quantity": 0},
+                    "CustomOriginConfig": {
+                        "HTTPPort": 80,
+                        "HTTPSPort": 443,
+                        "OriginProtocolPolicy": "http-only",
+                        "OriginSslProtocols": {
+                            "Quantity": 1,
+                            "Items": ["TLSv1.2"]
+                        },
+                        "OriginReadTimeout": 30,
+                        "OriginKeepaliveTimeout": 5,
+                        "IpAddressType": "ipv4"
+                    },
+                    "ConnectionAttempts": 3,
+                    "ConnectionTimeout": 10,
+                    "OriginShield": {"Enabled": false}
+                },
+                {
+                    "Id": "pipelineiq-frontend.s3.us-east-1.amazonaws.com-mms68lhgg5v",
+                    "DomainName": "pipelineiq-frontend.s3-website-us-east-1.amazonaws.com",
+                    "OriginPath": "",
+                    "CustomHeaders": {
+                        "Quantity": 0
+                    },
+                    "CustomOriginConfig": {
+                        "HTTPPort": 80,
+                        "HTTPSPort": 443,
+                        "OriginProtocolPolicy": "http-only",
+                        "OriginSslProtocols": {
+                            "Quantity": 4,
+                            "Items": [
+                {
+                    "Id": "ec2-backend",
+                    "DomainName": "100.24.243.177",
+                    "OriginPath": "",
+                    "CustomHeaders": {"Quantity": 0},
+                    "CustomOriginConfig": {
+                        "HTTPPort": 80,
+                        "HTTPSPort": 443,
+                        "OriginProtocolPolicy": "http-only",
+                        "OriginSslProtocols": {
+                            "Quantity": 1,
+                            "Items": ["TLSv1.2"]
+                        },
+                        "OriginReadTimeout": 30,
+                        "OriginKeepaliveTimeout": 5,
+                        "IpAddressType": "ipv4"
+                    },
+                    "ConnectionAttempts": 3,
+                    "ConnectionTimeout": 10,
+                    "OriginShield": {"Enabled": false}
+                },
+                                "SSLv3",
+                                "TLSv1",
+                                "TLSv1.1",
+                                "TLSv1.2"
+                            ]
+                        },
+                        "OriginReadTimeout": 30,
+                        "OriginKeepaliveTimeout": 5,
+                        "IpAddressType": "ipv4"
+                    },
+                    "ConnectionAttempts": 3,
+                    "ConnectionTimeout": 10,
+                    "OriginShield": {
+                        "Enabled": false
+                    },
+                    "OriginAccessControlId": ""
+                },
+                {
+                    "Id": "pipelineiq-frontend.s3-website-us-east-1.amazonaws.com",
+                    "DomainName": "pipelineiq-frontend.s3-website-us-east-1.amazonaws.com",
+                    "OriginPath": "",
+                    "CustomHeaders": {
+                        "Quantity": 0
+                    },
+                    "CustomOriginConfig": {
+                        "HTTPPort": 80,
+                        "HTTPSPort": 443,
+                        "OriginProtocolPolicy": "http-only",
+                        "OriginSslProtocols": {
+                            "Quantity": 4,
+                            "Items": [
+                {
+                    "Id": "ec2-backend",
+                    "DomainName": "100.24.243.177",
+                    "OriginPath": "",
+                    "CustomHeaders": {"Quantity": 0},
+                    "CustomOriginConfig": {
+                        "HTTPPort": 80,
+                        "HTTPSPort": 443,
+                        "OriginProtocolPolicy": "http-only",
+                        "OriginSslProtocols": {
+                            "Quantity": 1,
+                            "Items": ["TLSv1.2"]
+                        },
+                        "OriginReadTimeout": 30,
+                        "OriginKeepaliveTimeout": 5,
+                        "IpAddressType": "ipv4"
+                    },
+                    "ConnectionAttempts": 3,
+                    "ConnectionTimeout": 10,
+                    "OriginShield": {"Enabled": false}
+                },
+                                "SSLv3",
+                                "TLSv1",
+                                "TLSv1.1",
+                                "TLSv1.2"
+                            ]
+                        },
+                        "OriginReadTimeout": 30,
+                        "OriginKeepaliveTimeout": 5,
+                        "IpAddressType": "ipv4"
+                    },
+                    "ConnectionAttempts": 3,
+                    "ConnectionTimeout": 10,
+                    "OriginShield": {
+                        "Enabled": false
+                    },
+                    "OriginAccessControlId": ""
+                }
+            ]
+        },
+        "OriginGroups": {
+            "Quantity": 0
+        },
+        "DefaultCacheBehavior": {
+            "TargetOriginId": "pipelineiq-frontend.s3.us-east-1.amazonaws.com-mms68lhgg5v",
+            "TrustedSigners": {
+                "Enabled": false,
+                "Quantity": 0
+            },
+            "TrustedKeyGroups": {
+                "Enabled": false,
+                "Quantity": 0
+            },
+            "ViewerProtocolPolicy": "redirect-to-https",
+            "AllowedMethods": {
+                "Quantity": 2,
+                "Items": [
+                {
+                    "Id": "ec2-backend",
+                    "DomainName": "100.24.243.177",
+                    "OriginPath": "",
+                    "CustomHeaders": {"Quantity": 0},
+                    "CustomOriginConfig": {
+                        "HTTPPort": 80,
+                        "HTTPSPort": 443,
+                        "OriginProtocolPolicy": "http-only",
+                        "OriginSslProtocols": {
+                            "Quantity": 1,
+                            "Items": ["TLSv1.2"]
+                        },
+                        "OriginReadTimeout": 30,
+                        "OriginKeepaliveTimeout": 5,
+                        "IpAddressType": "ipv4"
+                    },
+                    "ConnectionAttempts": 3,
+                    "ConnectionTimeout": 10,
+                    "OriginShield": {"Enabled": false}
+                },
+                    "HEAD",
+                    "GET"
+                ],
+                "CachedMethods": {
+                    "Quantity": 2,
+                    "Items": [
+                {
+                    "Id": "ec2-backend",
+                    "DomainName": "100.24.243.177",
+                    "OriginPath": "",
+                    "CustomHeaders": {"Quantity": 0},
+                    "CustomOriginConfig": {
+                        "HTTPPort": 80,
+                        "HTTPSPort": 443,
+                        "OriginProtocolPolicy": "http-only",
+                        "OriginSslProtocols": {
+                            "Quantity": 1,
+                            "Items": ["TLSv1.2"]
+                        },
+                        "OriginReadTimeout": 30,
+                        "OriginKeepaliveTimeout": 5,
+                        "IpAddressType": "ipv4"
+                    },
+                    "ConnectionAttempts": 3,
+                    "ConnectionTimeout": 10,
+                    "OriginShield": {"Enabled": false}
+                },
+                        "HEAD",
+                        "GET"
+                    ]
+                }
+            },
+            "SmoothStreaming": false,
+            "Compress": true,
+            "LambdaFunctionAssociations": {
+                "Quantity": 0
+            },
+            "FunctionAssociations": {
+                "Quantity": 0
+            },
+            "FieldLevelEncryptionId": "",
+            "CachePolicyId": "658327ea-f89d-4fab-a63d-7e88639e58f6",
+            "GrpcConfig": {
+                "Enabled": false
+            }
+        },
+        "CacheBehaviors": {
+            "Quantity": 0
+        },
+        "CustomErrorResponses": {
+            "Quantity": 2,
+            "Items": [
+                {
+                    "Id": "ec2-backend",
+                    "DomainName": "100.24.243.177",
+                    "OriginPath": "",
+                    "CustomHeaders": {"Quantity": 0},
+                    "CustomOriginConfig": {
+                        "HTTPPort": 80,
+                        "HTTPSPort": 443,
+                        "OriginProtocolPolicy": "http-only",
+                        "OriginSslProtocols": {
+                            "Quantity": 1,
+                            "Items": ["TLSv1.2"]
+                        },
+                        "OriginReadTimeout": 30,
+                        "OriginKeepaliveTimeout": 5,
+                        "IpAddressType": "ipv4"
+                    },
+                    "ConnectionAttempts": 3,
+                    "ConnectionTimeout": 10,
+                    "OriginShield": {"Enabled": false}
+                },
+                {
+                    "ErrorCode": 403,
+                    "ResponsePagePath": "/index.html",
+                    "ResponseCode": "200",
+                    "ErrorCachingMinTTL": 10
+                },
+                {
+                    "ErrorCode": 404,
+                    "ResponsePagePath": "/index.html",
+                    "ResponseCode": "200",
+                    "ErrorCachingMinTTL": 10
+                }
+            ]
+        },
+        "Comment": "CDN for PipelineIQ frontend",
+        "Logging": {
+            "Enabled": false,
+            "IncludeCookies": false,
+            "Bucket": "",
+            "Prefix": ""
+        },
+        "PriceClass": "PriceClass_All",
+        "Enabled": true,
+        "ViewerCertificate": {
+            "CloudFrontDefaultCertificate": true,
+            "SSLSupportMethod": "vip",
+            "MinimumProtocolVersion": "TLSv1",
+            "CertificateSource": "cloudfront"
+        },
+        "Restrictions": {
+            "GeoRestriction": {
+                "RestrictionType": "none",
+                "Quantity": 0
+            }
+        },
+        "WebACLId": "arn:aws:wafv2:us-east-1:434927108661:global/webacl/CreatedByCloudFront-e9887c60/1e6a4e9e-9f56-4b4b-a261-a13f95557f6e",
+        "HttpVersion": "http2",
+        "IsIPV6Enabled": true,
+        "ContinuousDeploymentPolicyId": "",
+        "Staging": false
+    }
+}
