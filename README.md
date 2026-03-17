@@ -1,4 +1,4 @@
-Users
+<!-- Users
   ↓
 Frontend (React + Vite)
 AWS S3 Static Hosting
@@ -25,4 +25,4 @@ AWS S3 (React frontend)
 AWS EC2 (Node.js + Express API)
 Elastic IP: 100.24.243.177
    ↓
-MongoDB Atlas (Database)
+MongoDB Atlas (Database) -->
