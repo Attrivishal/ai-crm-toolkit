@@ -12,14 +12,13 @@ const refreshTokenSchema = new mongoose.Schema(
     token: {
         type: String,
         required: true,
-        unique: true,
-        index: true
+        unique: true
     },
 
     expiresAt: {
         type: Date,
-        required: true,
-        index: true
+        required: true
+        // Removed index: true to avoid duplicate
     },
 
     userAgent: {
@@ -58,11 +57,9 @@ refreshTokenSchema.virtual('isValidToken').get(function () {
 
 // Middleware: auto invalidate expired tokens
 refreshTokenSchema.pre('save', function () {
-
     if (this.expiresAt < new Date() && this.isValid) {
         this.isValid = false;
     }
-
 });
 
 // Clean expired tokens
@@ -72,7 +69,7 @@ refreshTokenSchema.statics.cleanExpired = function () {
     });
 };
 
-// TTL index
+// TTL index - this is the only index on expiresAt needed
 refreshTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 export default mongoose.model('RefreshToken', refreshTokenSchema);
