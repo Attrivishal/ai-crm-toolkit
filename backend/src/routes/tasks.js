@@ -3,29 +3,34 @@ import { body, validationResult, param } from 'express-validator';
 import Task from '../models/Task.js';
 import Lead from '../models/Lead.js';
 import { protect } from '../middleware/auth.js';
+import { validateWorkspaceAccess } from '../middleware/workspace.js';  // ← ADD THIS
 
 const router = express.Router();
 
-// Apply protection to all task routes
+// Apply authentication and workspace validation to all routes
 router.use(protect);
+router.use(validateWorkspaceAccess);  // ← ADD THIS
 
 // @route   GET /api/tasks
 router.get('/', async (req, res) => {
     try {
-        const { 
-            status, 
-            priority, 
-            category, 
-            leadId, 
-            limit = 50, 
+        const {
+            status,
+            priority,
+            category,
+            leadId,
+            limit = 50,
             page = 1,
             sortBy = 'dueDate',
             sortOrder = 'asc'
         } = req.query;
 
-        // Build query
-        const query = { userId: req.user._id };
-        
+        // Build query with workspace isolation
+        const query = { 
+            workspaceId: req.workspaceId,  // ← ADD THIS
+            userId: req.user._id 
+        };
+
         if (status) query.status = status;
         if (priority) query.priority = priority;
         if (category) query.category = category;
@@ -53,12 +58,16 @@ router.get('/', async (req, res) => {
 
         // Get counts by status
         const statusCounts = await Task.aggregate([
-            { $match: { userId: req.user._id } },
+            { $match: { 
+                workspaceId: req.workspaceId,  // ← ADD THIS
+                userId: req.user._id 
+            }},
             { $group: { _id: '$status', count: { $sum: 1 } } }
         ]);
 
         // Get overdue tasks count
         const overdueCount = await Task.countDocuments({
+            workspaceId: req.workspaceId,  // ← ADD THIS
             userId: req.user._id,
             status: { $nin: ['completed', 'cancelled'] },
             dueDate: { $lt: new Date() }
@@ -81,9 +90,9 @@ router.get('/', async (req, res) => {
         });
     } catch (error) {
         console.error('Error fetching tasks:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            message: 'Server error while fetching tasks' 
+            message: 'Server error while fetching tasks'
         });
     }
 });
@@ -92,6 +101,7 @@ router.get('/', async (req, res) => {
 router.get('/overdue', async (req, res) => {
     try {
         const tasks = await Task.find({
+            workspaceId: req.workspaceId,  // ← ADD THIS
             userId: req.user._id,
             status: { $nin: ['completed', 'cancelled'] },
             dueDate: { $lt: new Date() }
@@ -106,9 +116,9 @@ router.get('/overdue', async (req, res) => {
         });
     } catch (error) {
         console.error('Error fetching overdue tasks:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            message: 'Server error while fetching overdue tasks' 
+            message: 'Server error while fetching overdue tasks'
         });
     }
 });
@@ -118,11 +128,12 @@ router.get('/today', async (req, res) => {
     try {
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
-        
+
         const endOfDay = new Date();
         endOfDay.setHours(23, 59, 59, 999);
 
         const tasks = await Task.find({
+            workspaceId: req.workspaceId,  // ← ADD THIS
             userId: req.user._id,
             status: { $nin: ['completed', 'cancelled'] },
             dueDate: { $gte: startOfDay, $lte: endOfDay }
@@ -137,9 +148,9 @@ router.get('/today', async (req, res) => {
         });
     } catch (error) {
         console.error('Error fetching today\'s tasks:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            message: 'Server error while fetching today\'s tasks' 
+            message: 'Server error while fetching today\'s tasks'
         });
     }
 });
@@ -148,15 +159,16 @@ router.get('/today', async (req, res) => {
 router.get('/upcoming', async (req, res) => {
     try {
         const { days = 7 } = req.query;
-        
+
         const startDate = new Date();
         startDate.setHours(0, 0, 0, 0);
-        
+
         const endDate = new Date();
         endDate.setDate(endDate.getDate() + parseInt(days));
         endDate.setHours(23, 59, 59, 999);
 
         const tasks = await Task.find({
+            workspaceId: req.workspaceId,  // ← ADD THIS
             userId: req.user._id,
             status: { $nin: ['completed', 'cancelled'] },
             dueDate: { $gte: startDate, $lte: endDate }
@@ -172,9 +184,9 @@ router.get('/upcoming', async (req, res) => {
         });
     } catch (error) {
         console.error('Error fetching upcoming tasks:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            message: 'Server error while fetching upcoming tasks' 
+            message: 'Server error while fetching upcoming tasks'
         });
     }
 });
@@ -185,29 +197,32 @@ router.get('/:id', [
 ], async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-        return res.status(400).json({ 
+        return res.status(400).json({
             success: false,
-            errors: errors.array() 
+            errors: errors.array()
         });
     }
 
     try {
-        const task = await Task.findById(req.params.id)
+        const task = await Task.findOne({  // ← Use findOne instead of findById
+            _id: req.params.id,
+            workspaceId: req.workspaceId  // ← ADD THIS
+        })
             .populate('leadId')
             .populate('assignedTo', 'name email');
 
         if (!task) {
-            return res.status(404).json({ 
+            return res.status(404).json({
                 success: false,
-                message: 'Task not found' 
+                message: 'Task not found'
             });
         }
 
         // Check ownership
         if (task.userId.toString() !== req.user._id.toString()) {
-            return res.status(401).json({ 
+            return res.status(401).json({
                 success: false,
-                message: 'Not authorized to view this task' 
+                message: 'Not authorized to view this task'
             });
         }
 
@@ -217,9 +232,9 @@ router.get('/:id', [
         });
     } catch (error) {
         console.error('Error fetching task:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            message: 'Server error while fetching task' 
+            message: 'Server error while fetching task'
         });
     }
 });
@@ -231,13 +246,13 @@ router.post('/', [
         .trim()
         .isLength({ min: 3, max: 200 })
         .withMessage('Title must be between 3 and 200 characters'),
-    
+
     body('description')
         .optional()
         .trim()
         .isLength({ max: 1000 })
         .withMessage('Description cannot exceed 1000 characters'),
-    
+
     body('dueDate', 'Due date is required')
         .not().isEmpty()
         .isISO8601()
@@ -248,26 +263,27 @@ router.post('/', [
             }
             return true;
         }),
-    
+
     body('priority')
         .optional()
         .isIn(['Low', 'Medium', 'High', 'Urgent'])
         .withMessage('Invalid priority'),
-    
+
     body('category')
         .optional()
         .isIn(['Follow-up', 'Call', 'Email', 'Meeting', 'Research', 'Proposal', 'Other'])
         .withMessage('Invalid category'),
-    
+
     body('leadId')
         .optional()
         .isMongoId()
         .withMessage('Invalid lead ID')
         .custom(async (leadId, { req }) => {
             if (leadId) {
-                const lead = await Lead.findOne({ 
-                    _id: leadId, 
-                    userId: req.user._id 
+                const lead = await Lead.findOne({
+                    _id: leadId,
+                    workspaceId: req.workspaceId,  // ← ADD THIS
+                    userId: req.user._id
                 });
                 if (!lead) {
                     throw new Error('Lead not found or not authorized');
@@ -275,7 +291,7 @@ router.post('/', [
             }
             return true;
         }),
-    
+
     body('reminder')
         .optional()
         .isISO8601()
@@ -283,9 +299,9 @@ router.post('/', [
 ], async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-        return res.status(400).json({ 
+        return res.status(400).json({
             success: false,
-            errors: errors.array() 
+            errors: errors.array()
         });
     }
 
@@ -293,6 +309,7 @@ router.post('/', [
         const taskData = {
             ...req.body,
             userId: req.user._id,
+            workspaceId: req.workspaceId,  // ← ADD THIS
             source: 'Manual'
         };
 
@@ -310,9 +327,9 @@ router.post('/', [
         });
     } catch (error) {
         console.error('Error creating task:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            message: 'Server error while creating task' 
+            message: 'Server error while creating task'
         });
     }
 });
@@ -320,34 +337,34 @@ router.post('/', [
 // @route   PUT /api/tasks/:id
 router.put('/:id', [
     param('id').isMongoId().withMessage('Invalid task ID'),
-    
+
     body('title')
         .optional()
         .trim()
         .isLength({ min: 3, max: 200 })
         .withMessage('Title must be between 3 and 200 characters'),
-    
+
     body('description')
         .optional()
         .trim()
         .isLength({ max: 1000 })
         .withMessage('Description cannot exceed 1000 characters'),
-    
+
     body('dueDate')
         .optional()
         .isISO8601()
         .withMessage('Invalid date format'),
-    
+
     body('priority')
         .optional()
         .isIn(['Low', 'Medium', 'High', 'Urgent'])
         .withMessage('Invalid priority'),
-    
+
     body('category')
         .optional()
         .isIn(['Follow-up', 'Call', 'Email', 'Meeting', 'Research', 'Proposal', 'Other'])
         .withMessage('Invalid category'),
-    
+
     body('status')
         .optional()
         .isIn(['pending', 'in-progress', 'completed', 'cancelled'])
@@ -355,27 +372,30 @@ router.put('/:id', [
 ], async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-        return res.status(400).json({ 
+        return res.status(400).json({
             success: false,
-            errors: errors.array() 
+            errors: errors.array()
         });
     }
 
     try {
-        let task = await Task.findById(req.params.id);
-        
+        let task = await Task.findOne({  // ← Use findOne instead of findById
+            _id: req.params.id,
+            workspaceId: req.workspaceId  // ← ADD THIS
+        });
+
         if (!task) {
-            return res.status(404).json({ 
+            return res.status(404).json({
                 success: false,
-                message: 'Task not found' 
+                message: 'Task not found'
             });
         }
 
         // Check ownership
         if (task.userId.toString() !== req.user._id.toString()) {
-            return res.status(401).json({ 
+            return res.status(401).json({
                 success: false,
-                message: 'Not authorized to update this task' 
+                message: 'Not authorized to update this task'
             });
         }
 
@@ -398,9 +418,9 @@ router.put('/:id', [
         });
     } catch (error) {
         console.error('Error updating task:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            message: 'Server error while updating task' 
+            message: 'Server error while updating task'
         });
     }
 });
@@ -414,35 +434,38 @@ router.patch('/:id/status', [
 ], async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-        return res.status(400).json({ 
+        return res.status(400).json({
             success: false,
-            errors: errors.array() 
+            errors: errors.array()
         });
     }
 
     try {
         const { status } = req.body;
-        
-        let task = await Task.findById(req.params.id);
-        
+
+        let task = await Task.findOne({  // ← Use findOne instead of findById
+            _id: req.params.id,
+            workspaceId: req.workspaceId  // ← ADD THIS
+        });
+
         if (!task) {
-            return res.status(404).json({ 
+            return res.status(404).json({
                 success: false,
-                message: 'Task not found' 
+                message: 'Task not found'
             });
         }
 
         // Check ownership
         if (task.userId.toString() !== req.user._id.toString()) {
-            return res.status(401).json({ 
+            return res.status(401).json({
                 success: false,
-                message: 'Not authorized to update this task' 
+                message: 'Not authorized to update this task'
             });
         }
 
         // Prepare update data
         const updateData = { status };
-        
+
         // Set completedAt if status is completed
         if (status === 'completed' && task.status !== 'completed') {
             updateData.completedAt = new Date();
@@ -466,9 +489,9 @@ router.patch('/:id/status', [
         });
     } catch (error) {
         console.error('Error updating task status:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            message: 'Server error while updating task status' 
+            message: 'Server error while updating task status'
         });
     }
 });
@@ -479,27 +502,30 @@ router.delete('/:id', [
 ], async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-        return res.status(400).json({ 
+        return res.status(400).json({
             success: false,
-            errors: errors.array() 
+            errors: errors.array()
         });
     }
 
     try {
-        const task = await Task.findById(req.params.id);
-        
+        const task = await Task.findOne({  // ← Use findOne instead of findById
+            _id: req.params.id,
+            workspaceId: req.workspaceId  // ← ADD THIS
+        });
+
         if (!task) {
-            return res.status(404).json({ 
+            return res.status(404).json({
                 success: false,
-                message: 'Task not found' 
+                message: 'Task not found'
             });
         }
 
         // Check ownership
         if (task.userId.toString() !== req.user._id.toString()) {
-            return res.status(401).json({ 
+            return res.status(401).json({
                 success: false,
-                message: 'Not authorized to delete this task' 
+                message: 'Not authorized to delete this task'
             });
         }
 
@@ -511,9 +537,9 @@ router.delete('/:id', [
         });
     } catch (error) {
         console.error('Error deleting task:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            message: 'Server error while deleting task' 
+            message: 'Server error while deleting task'
         });
     }
 });
@@ -523,20 +549,23 @@ router.post('/:id/duplicate', [
     param('id').isMongoId().withMessage('Invalid task ID')
 ], async (req, res) => {
     try {
-        const task = await Task.findById(req.params.id);
-        
+        const task = await Task.findOne({  // ← Use findOne instead of findById
+            _id: req.params.id,
+            workspaceId: req.workspaceId  // ← ADD THIS
+        });
+
         if (!task) {
-            return res.status(404).json({ 
+            return res.status(404).json({
                 success: false,
-                message: 'Task not found' 
+                message: 'Task not found'
             });
         }
 
         // Check ownership
         if (task.userId.toString() !== req.user._id.toString()) {
-            return res.status(401).json({ 
+            return res.status(401).json({
                 success: false,
-                message: 'Not authorized to duplicate this task' 
+                message: 'Not authorized to duplicate this task'
             });
         }
 
@@ -546,7 +575,7 @@ router.post('/:id/duplicate', [
         delete taskData.createdAt;
         delete taskData.updatedAt;
         delete taskData.completedAt;
-        
+
         taskData.title = `${taskData.title} (Copy)`;
         taskData.status = 'pending';
         taskData.source = 'Manual';
@@ -560,9 +589,9 @@ router.post('/:id/duplicate', [
         });
     } catch (error) {
         console.error('Error duplicating task:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            message: 'Server error while duplicating task' 
+            message: 'Server error while duplicating task'
         });
     }
 });
@@ -571,6 +600,7 @@ router.post('/:id/duplicate', [
 router.delete('/completed/clear', async (req, res) => {
     try {
         const result = await Task.deleteMany({
+            workspaceId: req.workspaceId,  // ← ADD THIS
             userId: req.user._id,
             status: 'completed'
         });
@@ -582,9 +612,9 @@ router.delete('/completed/clear', async (req, res) => {
         });
     } catch (error) {
         console.error('Error clearing completed tasks:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            message: 'Server error while clearing completed tasks' 
+            message: 'Server error while clearing completed tasks'
         });
     }
 });
