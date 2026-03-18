@@ -3,6 +3,7 @@ import { body, validationResult, param, query } from 'express-validator';
 import Interaction from '../models/Interaction.js';
 import Lead from '../models/Lead.js';
 import { protect } from '../middleware/auth.js';
+import { validateWorkspaceAccess } from '../middleware/workspace.js';
 
 const router = express.Router();
 
@@ -39,7 +40,7 @@ router.get('/', [
         } = req.query;
 
         // Build query
-        const query = { userId: req.user._id };
+        const query = { workspaceId: req.workspaceId, userId: req.user._id };
         
         if (leadId) query.leadId = leadId;
         if (type) query.type = type;
@@ -69,7 +70,7 @@ router.get('/', [
 
         // Get summary statistics
         const stats = await Interaction.aggregate([
-            { $match: { userId: req.user._id } },
+            { $match: { workspaceId: req.workspaceId, userId: req.user._id } },
             { $group: {
                 _id: null,
                 totalInteractions: { $sum: 1 },
@@ -130,7 +131,7 @@ router.get('/lead/:leadId', [
         const { type, limit = 50 } = req.query;
 
         // Verify lead exists and belongs to user
-        const lead = await Lead.findById(leadId);
+        const lead = await Lead.findOne({ workspaceId: req.workspaceId,  _id: leadId, workspaceId: req.workspaceId });
         if (!lead) {
             return res.status(404).json({ 
                 success: false,
@@ -214,7 +215,7 @@ router.get('/:id', [
     }
 
     try {
-        const interaction = await Interaction.findById(req.params.id)
+        const interaction = await Interaction.findOne({ _id: req.params.id, workspaceId: req.workspaceId })
             .populate('leadId')
             .populate('userId', 'name email');
 
@@ -253,7 +254,7 @@ router.post('/', [
         .isMongoId()
         .withMessage('Invalid lead ID')
         .custom(async (leadId, { req }) => {
-            const lead = await Lead.findOne({ 
+            const lead = await Lead.findOne({ workspaceId: req.workspaceId,  
                 _id: leadId, 
                 userId: req.user._id 
             });
@@ -321,7 +322,7 @@ router.post('/', [
         await interaction.populate('leadId', 'name company email');
 
         // Update lead's last interaction date (you can add this field to Lead model if needed)
-        await Lead.findByIdAndUpdate(req.body.leadId, {
+        await Lead.findOneAndUpdate({ _id: req.body.leadId, workspaceId: req.workspaceId }, {
             lastInteractionAt: new Date()
         });
 
@@ -386,7 +387,7 @@ router.put('/:id', [
     }
 
     try {
-        let interaction = await Interaction.findById(req.params.id);
+        let interaction = await Interaction.findOne({ _id: req.params.id, workspaceId: req.workspaceId });
         
         if (!interaction) {
             return res.status(404).json({ 
@@ -439,7 +440,7 @@ router.delete('/:id', [
     }
 
     try {
-        const interaction = await Interaction.findById(req.params.id);
+        const interaction = await Interaction.findOne({ _id: req.params.id, workspaceId: req.workspaceId });
         
         if (!interaction) {
             return res.status(404).json({ 
@@ -479,7 +480,7 @@ router.get('/timeline/lead/:leadId', [
         const { leadId } = req.params;
 
         // Verify lead exists and belongs to user
-        const lead = await Lead.findById(leadId);
+        const lead = await Lead.findOne({ workspaceId: req.workspaceId,  _id: leadId, workspaceId: req.workspaceId });
         if (!lead) {
             return res.status(404).json({ 
                 success: false,
@@ -495,7 +496,7 @@ router.get('/timeline/lead/:leadId', [
         }
 
         // Get all interactions and group by date
-        const interactions = await Interaction.find({ 
+        const interactions = await Interaction.find({ workspaceId: req.workspaceId,  
             leadId,
             userId: req.user._id 
         })
