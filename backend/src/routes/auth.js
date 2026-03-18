@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import passport from 'passport';
 import User from '../models/User.js';
 import RefreshToken from '../models/RefreshToken.js';
+import Workspace from '../models/Workspace.js';
 import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -12,15 +13,15 @@ const router = express.Router();
 const generateTokens = async (userId, userAgent, ipAddress) => {
     // Generate access token (short-lived)
     const accessToken = jwt.sign(
-        { id: userId }, 
-        process.env.JWT_SECRET, 
+        { id: userId },
+        process.env.JWT_SECRET,
         { expiresIn: '15m' }
     );
-    
+
     // Generate refresh token (long-lived)
     const refreshToken = jwt.sign(
-        { id: userId }, 
-        process.env.JWT_SECRET, 
+        { id: userId },
+        process.env.JWT_SECRET,
         { expiresIn: '7d' }
     );
 
@@ -41,6 +42,34 @@ const generateTokens = async (userId, userAgent, ipAddress) => {
     return { accessToken, refreshToken };
 };
 
+// Helper to create personal workspace for new user
+const createPersonalWorkspace = async (userId, userName) => {
+    try {
+        // Create personal workspace
+        const workspace = await Workspace.create({
+            name: `${userName}'s Workspace`,
+            owner: userId,
+            isPersonal: true,
+            members: [{
+                user: userId,
+                role: 'owner',
+                joinedAt: new Date()
+            }]
+        });
+
+        // Add workspace to user
+        await User.findByIdAndUpdate(userId, {
+            $push: { workspaces: { workspace: workspace._id, role: 'owner', joinedAt: new Date() } },
+            $set: { defaultWorkspace: workspace._id }
+        });
+
+        return workspace;
+    } catch (error) {
+        console.error('Error creating personal workspace:', error);
+        throw error;
+    }
+};
+
 // ==================== GOOGLE OAUTH ROUTES ====================
 
 // @route   GET /api/auth/google
@@ -48,7 +77,7 @@ const generateTokens = async (userId, userAgent, ipAddress) => {
 // @access  Public
 router.get('/google', (req, res, next) => {
     const returnUrl = req.query.returnUrl || '/dashboard';
-    const authenticator = passport.authenticate('google', { 
+    const authenticator = passport.authenticate('google', {
         scope: ['profile', 'email'],
         state: returnUrl
     });
@@ -58,16 +87,16 @@ router.get('/google', (req, res, next) => {
 // @route   GET /api/auth/google/callback
 // @desc    Google OAuth callback
 // @access  Public
-router.get('/google/callback', 
-    passport.authenticate('google', { 
-        session: false, 
-        failureRedirect: `${process.env.CLIENT_URL}/login?error=google_auth_failed` 
+router.get('/google/callback',
+    passport.authenticate('google', {
+        session: false,
+        failureRedirect: `${process.env.CLIENT_URL}/login?error=google_auth_failed`
     }),
     async (req, res) => {
         try {
             const { user } = req.user;
             const returnUrl = req.query.state || '/dashboard';
-            
+
             // Generate tokens for the user
             const { accessToken, refreshToken } = await generateTokens(
                 user._id,
@@ -75,7 +104,12 @@ router.get('/google/callback',
                 req.ip
             );
 
-            // Update last login
+            // Check if user has any workspaces, create personal if not
+            const userWithWorkspaces = await User.findById(user._id).populate('workspaces.workspace');
+            if (!userWithWorkspaces.workspaces || userWithWorkspaces.workspaces.length === 0) {
+                await createPersonalWorkspace(user._id, user.name);
+            }
+
             await user.updateLastLogin();
 
             // Redirect to frontend with tokens
@@ -94,7 +128,7 @@ router.get('/google/callback',
 // @access  Public
 router.get('/github', (req, res, next) => {
     const returnUrl = req.query.returnUrl || '/dashboard';
-    const authenticator = passport.authenticate('github', { 
+    const authenticator = passport.authenticate('github', {
         scope: ['user:email'],
         state: returnUrl
     });
@@ -104,16 +138,16 @@ router.get('/github', (req, res, next) => {
 // @route   GET /api/auth/github/callback
 // @desc    GitHub OAuth callback
 // @access  Public
-router.get('/github/callback', 
-    passport.authenticate('github', { 
-        session: false, 
-        failureRedirect: `${process.env.CLIENT_URL}/login?error=github_auth_failed` 
+router.get('/github/callback',
+    passport.authenticate('github', {
+        session: false,
+        failureRedirect: `${process.env.CLIENT_URL}/login?error=github_auth_failed`
     }),
     async (req, res) => {
         try {
             const { user } = req.user;
             const returnUrl = req.query.state || '/dashboard';
-            
+
             // Generate tokens for the user
             const { accessToken, refreshToken } = await generateTokens(
                 user._id,
@@ -121,7 +155,12 @@ router.get('/github/callback',
                 req.ip
             );
 
-            // Update last login
+            // Check if user has any workspaces, create personal if not
+            const userWithWorkspaces = await User.findById(user._id).populate('workspaces.workspace');
+            if (!userWithWorkspaces.workspaces || userWithWorkspaces.workspaces.length === 0) {
+                await createPersonalWorkspace(user._id, user.name);
+            }
+
             await user.updateLastLogin();
 
             // Redirect to frontend with tokens
@@ -144,7 +183,7 @@ router.post('/register', [
         .trim()
         .isLength({ min: 2, max: 50 })
         .withMessage('Name must be between 2 and 50 characters'),
-    
+
     body('email', 'Please include a valid email')
         .isEmail()
         .normalizeEmail()
@@ -155,16 +194,16 @@ router.post('/register', [
             }
             return true;
         }),
-    
+
     body('password', 'Password must be at least 6 characters')
         .isLength({ min: 6 })
         .matches(/^(?=.*[A-Za-z])(?=.*\d)/)
         .withMessage('Password must contain at least one letter and one number'),
-    
+
     body('role', 'Invalid role')
         .optional()
         .isIn(['SDR', 'AE', 'Manager']),
-    
+
     body('company', 'Company name too long')
         .optional()
         .trim()
@@ -197,12 +236,13 @@ router.post('/register', [
 
         // Generate tokens
         const { accessToken, refreshToken } = await generateTokens(
-            user._id, 
+            user._id,
             req.headers['user-agent'],
             req.ip
         );
 
-        // Update last login
+        // Create personal workspace for new user
+        await createPersonalWorkspace(user._id, user.name);
         await user.updateLastLogin();
 
         // Return user data (excluding sensitive info)
@@ -226,9 +266,9 @@ router.post('/register', [
             stack: error.stack,
             name: error.name
         });
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            message: 'Registration failed. Please try again.' 
+            message: 'Registration failed. Please try again.'
         });
     }
 });
@@ -240,7 +280,7 @@ router.post('/login', [
     body('email', 'Please include a valid email')
         .isEmail()
         .normalizeEmail(),
-    
+
     body('password', 'Password is required')
         .not().isEmpty()
 ], async (req, res) => {
@@ -262,33 +302,33 @@ router.post('/login', [
 
         // Find user by email and include password field
         const user = await User.findOne({ email }).select('+password');
-        
+
         if (!user) {
-            return res.status(401).json({ 
+            return res.status(401).json({
                 success: false,
-                message: 'Invalid email or password' 
+                message: 'Invalid email or password'
             });
         }
 
         // Check if user is active
         if (!user.isActive) {
-            return res.status(401).json({ 
+            return res.status(401).json({
                 success: false,
-                message: 'Your account has been deactivated. Please contact support.' 
+                message: 'Your account has been deactivated. Please contact support.'
             });
         }
 
         // Check password
         const isMatch = await user.comparePassword(password);
         if (!isMatch) {
-            return res.status(401).json({ 
+            return res.status(401).json({
                 success: false,
-                message: 'Invalid email or password' 
+                message: 'Invalid email or password'
             });
         }
 
         // Remove old refresh tokens for this user (optional security)
-        await RefreshToken.deleteMany({ 
+        await RefreshToken.deleteMany({
             userId: user._id,
             isValid: true
         });
@@ -320,9 +360,9 @@ router.post('/login', [
         });
     } catch (error) {
         console.error('Login error:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            message: 'Login failed. Please try again.' 
+            message: 'Login failed. Please try again.'
         });
     }
 });
@@ -333,33 +373,33 @@ router.post('/login', [
 router.post('/refresh', async (req, res) => {
     try {
         const { refreshToken } = req.body;
-        
+
         if (!refreshToken) {
-            return res.status(401).json({ 
+            return res.status(401).json({
                 success: false,
-                message: 'Refresh token required' 
+                message: 'Refresh token required'
             });
         }
 
         // Find token in database
-        const storedToken = await RefreshToken.findOne({ 
+        const storedToken = await RefreshToken.findOne({
             token: refreshToken,
             isValid: true
         });
-        
+
         if (!storedToken) {
-            return res.status(401).json({ 
+            return res.status(401).json({
                 success: false,
-                message: 'Invalid refresh token' 
+                message: 'Invalid refresh token'
             });
         }
 
         // Check if token is expired
         if (storedToken.expiresAt < new Date()) {
             await RefreshToken.findByIdAndDelete(storedToken._id);
-            return res.status(403).json({ 
+            return res.status(403).json({
                 success: false,
-                message: 'Refresh token expired. Please login again.' 
+                message: 'Refresh token expired. Please login again.'
             });
         }
 
@@ -369,17 +409,17 @@ router.post('/refresh', async (req, res) => {
         // Check if user still exists
         const user = await User.findById(decoded.id);
         if (!user) {
-            return res.status(401).json({ 
+            return res.status(401).json({
                 success: false,
-                message: 'User not found' 
+                message: 'User not found'
             });
         }
 
         // Check if user is active
         if (!user.isActive) {
-            return res.status(401).json({ 
+            return res.status(401).json({
                 success: false,
-                message: 'Account deactivated' 
+                message: 'Account deactivated'
             });
         }
 
@@ -403,24 +443,24 @@ router.post('/refresh', async (req, res) => {
         });
     } catch (error) {
         console.error('Token refresh error:', error);
-        
+
         if (error.name === 'JsonWebTokenError') {
-            return res.status(403).json({ 
+            return res.status(403).json({
                 success: false,
-                message: 'Invalid refresh token' 
-            });
-        }
-        
-        if (error.name === 'TokenExpiredError') {
-            return res.status(403).json({ 
-                success: false,
-                message: 'Refresh token expired' 
+                message: 'Invalid refresh token'
             });
         }
 
-        res.status(500).json({ 
+        if (error.name === 'TokenExpiredError') {
+            return res.status(403).json({
+                success: false,
+                message: 'Refresh token expired'
+            });
+        }
+
+        res.status(500).json({
             success: false,
-            message: 'Token refresh failed' 
+            message: 'Token refresh failed'
         });
     }
 });
@@ -431,27 +471,27 @@ router.post('/refresh', async (req, res) => {
 router.post('/logout', async (req, res) => {
     try {
         const { refreshToken } = req.body;
-        
+
         if (refreshToken) {
             // Invalidate the refresh token
             await RefreshToken.findOneAndUpdate(
                 { token: refreshToken },
-                { 
+                {
                     isValid: false,
                     revokedAt: new Date()
                 }
             );
         }
 
-        res.json({ 
-            success: true, 
-            message: 'Logged out successfully' 
+        res.json({
+            success: true,
+            message: 'Logged out successfully'
         });
     } catch (error) {
         console.error('Logout error:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            message: 'Logout failed' 
+            message: 'Logout failed'
         });
     }
 });
@@ -464,21 +504,21 @@ router.post('/logout-all', protect, async (req, res) => {
         // Invalidate all refresh tokens for this user
         await RefreshToken.updateMany(
             { userId: req.user._id, isValid: true },
-            { 
+            {
                 isValid: false,
                 revokedAt: new Date()
             }
         );
 
-        res.json({ 
-            success: true, 
-            message: 'Logged out from all devices' 
+        res.json({
+            success: true,
+            message: 'Logged out from all devices'
         });
     } catch (error) {
         console.error('Logout all error:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            message: 'Logout failed' 
+            message: 'Logout failed'
         });
     }
 });
@@ -491,7 +531,8 @@ router.get('/me', protect, async (req, res) => {
         // Get user with additional stats
         const user = await User.findById(req.user._id)
             .select('-password')
-            .populate('leadsCount');
+            .populate('leadsCount')
+            .populate('workspaces.workspace');
 
         // Get active sessions count
         const activeSessions = await RefreshToken.countDocuments({
@@ -516,14 +557,20 @@ router.get('/me', protect, async (req, res) => {
                 stats: {
                     leadsCount: user.leadsCount || 0,
                     activeSessions
-                }
+                },
+                workspaces: user.workspaces ? user.workspaces.map(w => ({
+                    id: w.workspace._id,
+                    name: w.workspace.name,
+                    role: w.role,
+                    isPersonal: w.workspace.isPersonal
+                })) : []
             }
         });
     } catch (error) {
         console.error('Get me error:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            message: 'Failed to get user data' 
+            message: 'Failed to get user data'
         });
     }
 });
@@ -537,18 +584,18 @@ router.put('/me', protect, [
         .trim()
         .isLength({ min: 2, max: 50 })
         .withMessage('Name must be between 2 and 50 characters'),
-    
+
     body('phone')
         .optional()
         .matches(/^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/)
         .withMessage('Please provide a valid phone number'),
-    
+
     body('company')
         .optional()
         .trim()
         .isLength({ max: 100 })
         .withMessage('Company name too long'),
-    
+
     body('preferences')
         .optional()
         .isObject()
@@ -565,7 +612,7 @@ router.put('/me', protect, [
 
     try {
         const { name, phone, company, preferences } = req.body;
-        
+
         // Build update object
         const updateData = {};
         if (name) updateData.name = name;
@@ -587,11 +634,12 @@ router.put('/me', protect, [
         });
     } catch (error) {
         console.error('Update profile error:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            message: 'Failed to update profile' 
+            message: 'Failed to update profile'
         });
     }
 });
 
 export default router;
+

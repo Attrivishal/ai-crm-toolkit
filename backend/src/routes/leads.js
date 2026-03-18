@@ -3,10 +3,13 @@ import { body, validationResult } from 'express-validator';
 import Lead from '../models/Lead.js';
 import Interaction from '../models/Interaction.js';
 import { protect } from '../middleware/auth.js';
+import { validateWorkspaceAccess } from '../middleware/workspace.js';
 
 const router = express.Router();
 
+// Apply authentication and workspace validation to all routes
 router.use(protect);
+router.use(validateWorkspaceAccess);
 
 // @route   GET /api/leads
 router.get('/', async (req, res) => {
@@ -15,8 +18,14 @@ router.get('/', async (req, res) => {
         const limit = parseInt(req.query.limit, 10) || 10;
         const startIndex = (page - 1) * limit;
 
+        // Build query - workspaceId is optional now
         const query = { userId: req.user._id };
         
+        // Add workspaceId to query if available
+        if (req.workspaceId) {
+            query.workspaceId = req.workspaceId;
+        }
+
         // Search functionality
         if (req.query.search) {
             const searchRegex = new RegExp(req.query.search, 'i');
@@ -26,7 +35,7 @@ router.get('/', async (req, res) => {
                 { email: searchRegex }
             ];
         }
-        
+
         // Filter by status
         if (req.query.status) {
             query.status = req.query.status;
@@ -53,10 +62,15 @@ router.get('/', async (req, res) => {
 
         // Get interaction counts for each lead
         const leadsWithStats = await Promise.all(leads.map(async (lead) => {
-            const interactionCount = await Interaction.countDocuments({ leadId: lead._id });
-            const lastInteraction = await Interaction.findOne({ leadId: lead._id })
-                .sort({ createdAt: -1 });
+            const interactionQuery = { leadId: lead._id };
+            if (req.workspaceId) {
+                interactionQuery.workspaceId = req.workspaceId;
+            }
             
+            const interactionCount = await Interaction.countDocuments(interactionQuery);
+            const lastInteraction = await Interaction.findOne(interactionQuery)
+                .sort({ createdAt: -1 });
+
             return {
                 ...lead.toObject(),
                 interactionCount,
@@ -84,21 +98,28 @@ router.get('/', async (req, res) => {
 // @route   GET /api/leads/:id
 router.get('/:id', async (req, res) => {
     try {
-        const lead = await Lead.findById(req.params.id);
+        const query = { _id: req.params.id, userId: req.user._id };
+        if (req.workspaceId) {
+            query.workspaceId = req.workspaceId;
+        }
+        
+        const lead = await Lead.findOne(query);
+        
         if (!lead) {
             return res.status(404).json({ message: 'Lead not found' });
         }
 
-        if (lead.userId.toString() !== req.user._id.toString()) {
-            return res.status(401).json({ message: 'Not authorized' });
-        }
-
         // Get interactions for this lead
-        const interactions = await Interaction.find({ leadId: lead._id })
+        const interactionQuery = { leadId: lead._id };
+        if (req.workspaceId) {
+            interactionQuery.workspaceId = req.workspaceId;
+        }
+        
+        const interactions = await Interaction.find(interactionQuery)
             .sort({ createdAt: -1 });
 
-        res.json({ 
-            success: true, 
+        res.json({
+            success: true,
             lead: {
                 ...lead.toObject(),
                 interactions
@@ -128,32 +149,44 @@ router.post('/', [
 
     try {
         // Check if lead already exists
-        const existingLead = await Lead.findOne({ 
-            email: req.body.email,
-            userId: req.user._id 
-        });
+        const query = { email: req.body.email, userId: req.user._id };
+        if (req.workspaceId) {
+            query.workspaceId = req.workspaceId;
+        }
         
+        const existingLead = await Lead.findOne(query);
+
         if (existingLead) {
-            return res.status(400).json({ 
-                message: 'A lead with this email already exists' 
+            return res.status(400).json({
+                message: 'A lead with this email already exists'
             });
         }
 
-        const leadData = { 
-            ...req.body, 
+        const leadData = {
+            ...req.body,
             userId: req.user._id,
-            leadScore: 0 // Initialize with 0, will be updated by AI
+            leadScore: 0
         };
         
+        if (req.workspaceId) {
+            leadData.workspaceId = req.workspaceId;
+        }
+
         const lead = await Lead.create(leadData);
 
         // Create initial interaction
-        await Interaction.create({
+        const interactionData = {
             leadId: lead._id,
             userId: req.user._id,
             type: 'Note',
             notes: 'Lead created'
-        });
+        };
+        
+        if (req.workspaceId) {
+            interactionData.workspaceId = req.workspaceId;
+        }
+        
+        await Interaction.create(interactionData);
 
         res.status(201).json({ success: true, lead });
     } catch (error) {
@@ -165,21 +198,23 @@ router.post('/', [
 // @route   PUT /api/leads/:id
 router.put('/:id', async (req, res) => {
     try {
-        let lead = await Lead.findById(req.params.id);
+        const query = { _id: req.params.id, userId: req.user._id };
+        if (req.workspaceId) {
+            query.workspaceId = req.workspaceId;
+        }
+        
+        let lead = await Lead.findOne(query);
+        
         if (!lead) {
             return res.status(404).json({ message: 'Lead not found' });
         }
 
-        if (lead.userId.toString() !== req.user._id.toString()) {
-            return res.status(401).json({ message: 'Not authorized' });
-        }
-
         // Don't allow updating certain fields
-        const { userId, ...updateData } = req.body;
+        const { userId, workspaceId, ...updateData } = req.body;
 
         lead = await Lead.findByIdAndUpdate(
-            req.params.id, 
-            updateData, 
+            req.params.id,
+            updateData,
             { new: true, runValidators: true }
         );
 
@@ -192,18 +227,25 @@ router.put('/:id', async (req, res) => {
 // @route   DELETE /api/leads/:id
 router.delete('/:id', async (req, res) => {
     try {
-        const lead = await Lead.findById(req.params.id);
+        const query = { _id: req.params.id, userId: req.user._id };
+        if (req.workspaceId) {
+            query.workspaceId = req.workspaceId;
+        }
+        
+        const lead = await Lead.findOne(query);
+        
         if (!lead) {
             return res.status(404).json({ message: 'Lead not found' });
         }
 
-        if (lead.userId.toString() !== req.user._id.toString()) {
-            return res.status(401).json({ message: 'Not authorized' });
-        }
-
         // Delete all interactions first
-        await Interaction.deleteMany({ leadId: lead._id });
+        const interactionQuery = { leadId: lead._id };
+        if (req.workspaceId) {
+            interactionQuery.workspaceId = req.workspaceId;
+        }
         
+        await Interaction.deleteMany(interactionQuery);
+
         // Then delete the lead
         await lead.deleteOne();
 
@@ -226,13 +268,15 @@ router.patch('/:id/status', async (req, res) => {
     }
 
     try {
-        let lead = await Lead.findById(req.params.id);
+        const query = { _id: req.params.id, userId: req.user._id };
+        if (req.workspaceId) {
+            query.workspaceId = req.workspaceId;
+        }
+        
+        let lead = await Lead.findOne(query);
+        
         if (!lead) {
             return res.status(404).json({ message: 'Lead not found' });
-        }
-
-        if (lead.userId.toString() !== req.user._id.toString()) {
-            return res.status(401).json({ message: 'Not authorized' });
         }
 
         const oldStatus = lead.status;
@@ -240,12 +284,18 @@ router.patch('/:id/status', async (req, res) => {
         await lead.save();
 
         // Create interaction for status change
-        await Interaction.create({
+        const interactionData = {
             leadId: lead._id,
             userId: req.user._id,
             type: 'Note',
             notes: `Status changed from ${oldStatus} to ${status}`
-        });
+        };
+        
+        if (req.workspaceId) {
+            interactionData.workspaceId = req.workspaceId;
+        }
+        
+        await Interaction.create(interactionData);
 
         res.json({ success: true, lead });
     } catch (error) {
@@ -256,13 +306,15 @@ router.patch('/:id/status', async (req, res) => {
 // @route   POST /api/leads/:id/analyze
 router.post('/:id/analyze', async (req, res) => {
     try {
-        const lead = await Lead.findById(req.params.id);
+        const query = { _id: req.params.id, userId: req.user._id };
+        if (req.workspaceId) {
+            query.workspaceId = req.workspaceId;
+        }
+        
+        const lead = await Lead.findOne(query);
+        
         if (!lead) {
             return res.status(404).json({ message: 'Lead not found' });
-        }
-
-        if (lead.userId.toString() !== req.user._id.toString()) {
-            return res.status(401).json({ message: 'Not authorized' });
         }
 
         // Forward to AI service
@@ -276,7 +328,8 @@ router.post('/:id/analyze', async (req, res) => {
                 leadId: lead._id,
                 industry: lead.industry,
                 notes: lead.notes,
-                company: lead.company
+                company: lead.company,
+                workspaceId: req.workspaceId
             })
         });
 
