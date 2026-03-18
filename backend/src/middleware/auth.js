@@ -4,6 +4,7 @@ import User from '../models/User.js';
 export const protect = async (req, res, next) => {
     let token;
 
+    console.log("🔒 protect middleware - START");
     try {
         // Check for token in Authorization header
         if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
@@ -22,9 +23,11 @@ export const protect = async (req, res, next) => {
         }
 
         // Verify token
+    console.log("🔒 protect middleware - token verified");
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
         // Get user from database
+    console.log("🔒 protect middleware - fetching user");
         const user = await User.findById(decoded.id).select('-password');
         
         if (!user) {
@@ -44,9 +47,11 @@ export const protect = async (req, res, next) => {
 
         // Attach user to request
         req.user = user;
+    console.log("🔒 protect middleware - user attached:", user?._id);
         next();
 
     } catch (error) {
+    console.error("🔒 protect middleware - ERROR:", error.message);
         if (error.name === 'JsonWebTokenError') {
             return res.status(401).json({ 
                 success: false,
@@ -91,6 +96,7 @@ export const authorizeRoles = (...roles) => {
 
 // Optional: Middleware to check if user owns the resource
 export const checkOwnership = (model) => async (req, res, next) => {
+    console.log("🔒 protect middleware - START");
     try {
         const resourceId = req.params.id;
         const userId = req.user._id;
@@ -114,6 +120,7 @@ export const checkOwnership = (model) => async (req, res, next) => {
         req.resource = resource;
         next();
     } catch (error) {
+    console.error("🔒 protect middleware - ERROR:", error.message);
         next(error);
     }
 };

@@ -122,13 +122,20 @@ const api = axios.create({
   timeout: 30000,
 });
 
-// Request interceptor to add token
+// Request interceptor to add token and workspace ID
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('accessToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // Add workspace ID header if available
+    const workspaceId = localStorage.getItem('currentWorkspaceId');
+    if (workspaceId) {
+      config.headers['X-Workspace-ID'] = workspaceId;
+    }
+    
     return config;
   },
   (error) => Promise.reject(error)
@@ -148,18 +155,18 @@ api.interceptors.response.use(
         if (!refreshToken) throw new Error('No refresh token');
 
         const response = await axios.post(`${API_URL}/auth/refresh`, { refreshToken });
-        
+
         const { token, refreshToken: newRefreshToken } = response.data;
-        
+
         localStorage.setItem('accessToken', token);
         localStorage.setItem('refreshToken', newRefreshToken);
-        
+
         originalRequest.headers.Authorization = `Bearer ${token}`;
         return api(originalRequest);
       } catch (refreshError) {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
-        localStorage.removeItem('oauth_redirect'); // Add this line
+        localStorage.removeItem('oauth_redirect');
         window.location.href = '/login';
         return Promise.reject(refreshError);
       }
@@ -180,24 +187,24 @@ api.interceptors.response.use(
 
 // Auth API
 export const authApi = {
-  login: (credentials: LoginCredentials) => 
+  login: (credentials: LoginCredentials) =>
     api.post<AuthResponse>('/auth/login', credentials),
-  
-  register: (data: RegisterData) => 
+
+  register: (data: RegisterData) =>
     api.post<AuthResponse>('/auth/register', data),
-  
-  logout: () => 
+
+  logout: () =>
     api.post('/auth/logout'),
-  
-  logoutAll: () => 
+
+  logoutAll: () =>
     api.post('/auth/logout-all'),
-  
-  getMe: () => 
+
+  getMe: () =>
     api.get<{ success: boolean; user: User }>('/auth/me'),
-  
-  updateProfile: (data: Partial<User>) => 
+
+  updateProfile: (data: Partial<User>) =>
     api.put<{ success: boolean; user: User }>('/auth/me', data),
-  
+
   // Add this function for OAuth
   handleOAuthCallback: (token: string, refreshToken?: string) => {
     localStorage.setItem('accessToken', token);
@@ -209,96 +216,96 @@ export const authApi = {
 
 // Leads API
 export const leadsApi = {
-  getLeads: (params?: any) => 
+  getLeads: (params?: any) =>
     api.get('/leads', { params }),
-  
-  getLead: (id: string) => 
+
+  getLead: (id: string) =>
     api.get<{ success: boolean; lead: Lead }>(`/leads/${id}`),
-  
-  createLead: (data: Partial<Lead>) => 
+
+  createLead: (data: Partial<Lead>) =>
     api.post<{ success: boolean; lead: Lead }>('/leads', data),
-  
-  updateLead: (id: string, data: Partial<Lead>) => 
+
+  updateLead: (id: string, data: Partial<Lead>) =>
     api.put<{ success: boolean; lead: Lead }>(`/leads/${id}`, data),
-  
-  deleteLead: (id: string) => 
+
+  deleteLead: (id: string) =>
     api.delete<{ success: boolean; message: string }>(`/leads/${id}`),
-  
-  updateStatus: (id: string, status: string) => 
+
+  updateStatus: (id: string, status: string) =>
     api.patch<{ success: boolean; lead: Lead }>(`/leads/${id}/status`, { status }),
-  
-  analyzeLead: (id: string) => 
+
+  analyzeLead: (id: string) =>
     api.post(`/leads/${id}/analyze`),
 };
 
 // Tasks API
 export const tasksApi = {
-  getTasks: (params?: any) => 
+  getTasks: (params?: any) =>
     api.get('/tasks', { params }),
-  
-  getTask: (id: string) => 
+
+  getTask: (id: string) =>
     api.get<{ success: boolean; task: Task }>(`/tasks/${id}`),
-  
-  createTask: (data: Partial<Task>) => 
+
+  createTask: (data: Partial<Task>) =>
     api.post<{ success: boolean; task: Task }>('/tasks', data),
-  
-  updateTask: (id: string, data: Partial<Task>) => 
+
+  updateTask: (id: string, data: Partial<Task>) =>
     api.put<{ success: boolean; task: Task }>(`/tasks/${id}`, data),
-  
-  deleteTask: (id: string) => 
+
+  deleteTask: (id: string) =>
     api.delete<{ success: boolean; message: string }>(`/tasks/${id}`),
-  
-  updateStatus: (id: string, status: string) => 
+
+  updateStatus: (id: string, status: string) =>
     api.patch<{ success: boolean; task: Task }>(`/tasks/${id}/status`, { status }),
-  
-  getOverdue: () => 
+
+  getOverdue: () =>
     api.get('/tasks/overdue'),
-  
-  getToday: () => 
+
+  getToday: () =>
     api.get('/tasks/today'),
-  
-  getUpcoming: (days?: number) => 
+
+  getUpcoming: (days?: number) =>
     api.get('/tasks/upcoming', { params: { days } }),
-  
-  duplicateTask: (id: string) => 
+
+  duplicateTask: (id: string) =>
     api.post<{ success: boolean; task: Task }>(`/tasks/${id}/duplicate`),
-  
-  clearCompleted: () => 
+
+  clearCompleted: () =>
     api.delete('/tasks/completed/clear'),
 };
 
 // Interactions API
 export const interactionsApi = {
-  getInteractions: (params?: any) => 
+  getInteractions: (params?: any) =>
     api.get('/interactions', { params }),
-  
-  getLeadInteractions: (leadId: string, params?: any) => 
+
+  getLeadInteractions: (leadId: string, params?: any) =>
     api.get(`/interactions/lead/${leadId}`, { params }),
-  
-  getInteraction: (id: string) => 
+
+  getInteraction: (id: string) =>
     api.get<{ success: boolean; interaction: Interaction }>(`/interactions/${id}`),
-  
-  createInteraction: (data: Partial<Interaction>) => 
+
+  createInteraction: (data: Partial<Interaction>) =>
     api.post<{ success: boolean; interaction: Interaction }>('/interactions', data),
-  
-  updateInteraction: (id: string, data: Partial<Interaction>) => 
+
+  updateInteraction: (id: string, data: Partial<Interaction>) =>
     api.put<{ success: boolean; interaction: Interaction }>(`/interactions/${id}`, data),
-  
-  deleteInteraction: (id: string) => 
+
+  deleteInteraction: (id: string) =>
     api.delete<{ success: boolean; message: string }>(`/interactions/${id}`),
-  
-  getTimeline: (leadId: string) => 
+
+  getTimeline: (leadId: string) =>
     api.get(`/interactions/timeline/lead/${leadId}`),
-  
-  getStats: (days?: number) => 
+
+  getStats: (days?: number) =>
     api.get('/interactions/stats/summary', { params: { days } }),
 };
 
 // AI API
 export const aiApi = {
-  analyzeLead: (data: { leadId?: string; industry: string; notes: string; company: string }) => 
+  analyzeLead: (data: { leadId?: string; industry: string; notes: string; company: string }) =>
     api.post('/ai/analyze-lead', data),
-  
+
   generateEmail: (data: {
     leadName: string;
     company: string;
@@ -308,15 +315,82 @@ export const aiApi = {
     senderName?: string;
     leadId?: string;
   }) => api.post('/ai/generate-email', data),
-  
-  summarizeMeeting: (data: { notes: string; leadName?: string; company?: string; leadId?: string }) => 
+
+  summarizeMeeting: (data: { notes: string; leadName?: string; company?: string; leadId?: string }) =>
     api.post('/ai/summarize-meeting', data),
-  
-  predictDealRisk: (leadId: string) => 
+
+  predictDealRisk: (leadId: string) =>
     api.post('/ai/deal-risk', { leadId }),
-  
-  generateProposal: (data: { leadId: string; template?: string; focusPoints?: string[] }) => 
+
+  generateProposal: (data: { leadId: string; template?: string; focusPoints?: string[] }) =>
     api.post('/ai/generate-proposal', data),
+};
+
+// ==================== WORKSPACE API ====================
+
+export interface Workspace {
+  id: string;
+  name: string;
+  slug: string;
+  role: 'owner' | 'admin' | 'member' | 'viewer';
+  settings: {
+    currency: string;
+    timezone: string;
+  };
+  stats?: {
+    totalLeads: number;
+    totalValue: number;
+    activeMembers: number;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorkspaceMember {
+  id: string;
+  email: string;
+  name: string;
+  role: 'owner' | 'admin' | 'member' | 'viewer';
+  joinedAt: string;
+  avatar?: string;
+}
+
+export const workspaceApi = {
+  // Get all workspaces for current user
+  getWorkspaces: () =>
+    api.get<{ success: boolean; workspaces: Workspace[] }>('/workspaces'),
+
+  // Get single workspace by ID
+  getWorkspace: (id: string) =>
+    api.get<{ success: boolean; workspace: Workspace }>(`/workspaces/${id}`),
+
+  // Create new workspace
+  createWorkspace: (data: { name: string }) =>
+    api.post<{ success: boolean; workspace: Workspace }>('/workspaces', data),
+
+  // Update workspace
+  updateWorkspace: (id: string, data: Partial<Workspace>) =>
+    api.put<{ success: boolean; workspace: Workspace }>(`/workspaces/${id}`, data),
+
+  // Delete workspace
+  deleteWorkspace: (id: string) =>
+    api.delete<{ success: boolean; message: string }>(`/workspaces/${id}`),
+
+  // Get workspace members
+  getMembers: (workspaceId: string) =>
+    api.get<{ success: boolean; members: WorkspaceMember[] }>(`/workspaces/${workspaceId}/members`),
+
+  // Add member to workspace
+  addMember: (workspaceId: string, data: { email: string; role: string }) =>
+    api.post<{ success: boolean; member: WorkspaceMember }>(`/workspaces/${workspaceId}/members`, data),
+
+  // Remove member from workspace
+  removeMember: (workspaceId: string, userId: string) =>
+    api.delete<{ success: boolean; message: string }>(`/workspaces/${workspaceId}/members/${userId}`),
+
+  // Update member role
+  updateMemberRole: (workspaceId: string, userId: string, role: string) =>
+    api.patch<{ success: boolean; member: WorkspaceMember }>(`/workspaces/${workspaceId}/members/${userId}`, { role }),
 };
 
 // OAuth helper function (optional but useful)
@@ -325,14 +399,14 @@ export const oauthHelper = {
   getAuthUrl: (provider: 'google' | 'github') => {
     return `${API_URL}/auth/${provider}`;
   },
-  
+
   // Handle OAuth callback
   handleCallback: () => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
     const refreshToken = params.get('refreshToken');
     const error = params.get('error');
-    
+
     return { token, refreshToken, error };
   },
 };

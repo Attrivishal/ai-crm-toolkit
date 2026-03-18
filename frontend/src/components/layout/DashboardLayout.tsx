@@ -42,6 +42,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useWorkspace } from '../../contexts/workspace/useWorkspace'; // ← ADD THIS
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -152,34 +153,23 @@ const SidebarItem = ({ item, collapsed }: { item: NavItem; collapsed: boolean })
   );
 };
 
-// Workspace Switcher Component (Now Functional)
+// Workspace Switcher Component (Now with Real Data)
 const WorkspaceSwitcher = ({ collapsed }: { collapsed: boolean }) => {
   const [open, setOpen] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [workspaces, setWorkspaces] = useState([
-    { id: 1, name: 'Acme Workspace', active: true },
-    { id: 2, name: 'Personal', active: false },
-  ]);
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
+  const { workspaces, currentWorkspace, switchWorkspace, createWorkspace } = useWorkspace();
 
-  const handleCreateWorkspace = () => {
+  const handleCreateWorkspace = async () => {
     if (newWorkspaceName.trim()) {
-      const newWorkspace = {
-        id: workspaces.length + 1,
-        name: newWorkspaceName,
-        active: false,
-      };
-      setWorkspaces([...workspaces, newWorkspace]);
+      await createWorkspace(newWorkspaceName);
       setNewWorkspaceName('');
       setShowCreateDialog(false);
     }
   };
 
-  const handleSwitchWorkspace = (workspaceId: number) => {
-    setWorkspaces(workspaces.map(w => ({
-      ...w,
-      active: w.id === workspaceId
-    })));
+  const handleSwitchWorkspace = async (workspaceId: string) => {
+    await switchWorkspace(workspaceId);
     setOpen(false);
   };
 
@@ -195,13 +185,13 @@ const WorkspaceSwitcher = ({ collapsed }: { collapsed: boolean }) => {
           <DropdownMenuContent align="start" className="w-48">
             <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
             {workspaces.map((ws) => (
-              <DropdownMenuItem 
-                key={ws.id} 
+              <DropdownMenuItem
+                key={ws.id}
                 onClick={() => handleSwitchWorkspace(ws.id)}
                 className="flex items-center justify-between"
               >
                 {ws.name}
-                {ws.active && <CheckCircle2 className="w-3 h-3 text-primary" />}
+                {currentWorkspace?.id === ws.id && <CheckCircle2 className="w-3 h-3 text-primary" />}
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
@@ -252,7 +242,7 @@ const WorkspaceSwitcher = ({ collapsed }: { collapsed: boolean }) => {
               <Briefcase className="w-3 h-3 text-primary" />
             </div>
             <span className="font-medium text-sm">
-              {workspaces.find(w => w.active)?.name || 'Select Workspace'}
+              {currentWorkspace?.name || 'Select Workspace'}
             </span>
           </div>
           <ChevronDown className="w-4 h-4 text-muted-foreground" />
@@ -260,13 +250,13 @@ const WorkspaceSwitcher = ({ collapsed }: { collapsed: boolean }) => {
         <DropdownMenuContent align="start" className="w-56">
           <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
           {workspaces.map((ws) => (
-            <DropdownMenuItem 
-              key={ws.id} 
+            <DropdownMenuItem
+              key={ws.id}
               onClick={() => handleSwitchWorkspace(ws.id)}
               className="flex items-center justify-between"
             >
               {ws.name}
-              {ws.active && <CheckCircle2 className="w-4 h-4 text-primary" />}
+              {currentWorkspace?.id === ws.id && <CheckCircle2 className="w-3 h-3 text-primary" />}
             </DropdownMenuItem>
           ))}
           <DropdownMenuSeparator />
@@ -551,6 +541,7 @@ const DashboardLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
+  const { workspaces, isLoading: workspacesLoading } = useWorkspace(); // Add this
 
   useEffect(() => {
     // NProgress for page transitions
@@ -558,7 +549,7 @@ const DashboardLayout = () => {
     const timer = setTimeout(() => {
       NProgress.done();
     }, 500);
-    
+
     return () => {
       clearTimeout(timer);
       NProgress.done();
@@ -581,6 +572,18 @@ const DashboardLayout = () => {
     await logout();
     navigate('/login');
   };
+
+  // Show loading state while workspaces are loading
+  if (workspacesLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading your workspace...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">

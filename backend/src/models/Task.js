@@ -1,14 +1,21 @@
 import mongoose from 'mongoose';
 
 const taskSchema = new mongoose.Schema({
-    leadId: { 
-        type: mongoose.Schema.Types.ObjectId, 
+    // Add workspaceId as the first field for data isolation
+    workspaceId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Workspace',
+        required: [true, 'Workspace ID is required'],
+        index: true
+    },
+    leadId: {
+        type: mongoose.Schema.Types.ObjectId,
         ref: 'Lead',
         index: true
     },
-    userId: { 
-        type: mongoose.Schema.Types.ObjectId, 
-        ref: 'User', 
+    userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
         required: [true, 'User ID is required'],
         index: true
     },
@@ -18,17 +25,17 @@ const taskSchema = new mongoose.Schema({
         trim: true,
         maxlength: [200, 'Title cannot exceed 200 characters']
     },
-    description: { 
+    description: {
         type: String,
         maxlength: [1000, 'Description cannot exceed 1000 characters']
     },
-    dueDate: { 
-        type: Date, 
+    dueDate: {
+        type: Date,
         required: [true, 'Due date is required'],
         index: true
     },
-    status: { 
-        type: String, 
+    status: {
+        type: String,
         enum: {
             values: ['pending', 'in-progress', 'completed', 'cancelled', 'overdue'],
             message: '{VALUE} is not a valid status'
@@ -36,8 +43,8 @@ const taskSchema = new mongoose.Schema({
         default: 'pending',
         index: true
     },
-    priority: { 
-        type: String, 
+    priority: {
+        type: String,
         enum: {
             values: ['Low', 'Medium', 'High', 'Urgent'],
             message: '{VALUE} is not a valid priority'
@@ -45,8 +52,8 @@ const taskSchema = new mongoose.Schema({
         default: 'Medium',
         index: true
     },
-    source: { 
-        type: String, 
+    source: {
+        type: String,
         enum: {
             values: ['AI-Generated', 'Manual', 'System'],
             message: '{VALUE} is not a valid source'
@@ -73,7 +80,7 @@ const taskSchema = new mongoose.Schema({
         of: mongoose.Schema.Types.Mixed,
         default: {}
     }
-}, { 
+}, {
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true }
@@ -96,19 +103,21 @@ taskSchema.pre('save', function(next) {
     if (this.status !== 'completed' && this.dueDate < new Date()) {
         this.status = 'overdue';
     }
-    
+
     // Set completedAt when status changes to completed
     if (this.isModified('status') && this.status === 'completed' && !this.completedAt) {
         this.completedAt = new Date();
     }
-    
+
     next();
 });
 
-// Indexes
-taskSchema.index({ userId: 1, status: 1 });
-taskSchema.index({ userId: 1, dueDate: 1 });
-taskSchema.index({ userId: 1, priority: -1 });
-taskSchema.index({ leadId: 1, status: 1 });
+// Indexes - All updated to include workspaceId for data isolation
+taskSchema.index({ workspaceId: 1, userId: 1, status: 1 });
+taskSchema.index({ workspaceId: 1, userId: 1, dueDate: 1 });
+taskSchema.index({ workspaceId: 1, userId: 1, priority: -1 });
+taskSchema.index({ workspaceId: 1, leadId: 1, status: 1 });
+taskSchema.index({ workspaceId: 1, assignedTo: 1, status: 1 }); // For assigned tasks
+taskSchema.index({ workspaceId: 1, dueDate: 1, status: 1 }); // For overdue queries
 
 export default mongoose.model('Task', taskSchema);

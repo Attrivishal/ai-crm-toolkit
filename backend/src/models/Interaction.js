@@ -1,20 +1,27 @@
 import mongoose from 'mongoose';
 
 const interactionSchema = new mongoose.Schema({
-    leadId: { 
-        type: mongoose.Schema.Types.ObjectId, 
-        ref: 'Lead', 
+    // Add workspaceId as the first field for data isolation
+    workspaceId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Workspace',
+        required: [true, 'Workspace ID is required'],
+        index: true
+    },
+    leadId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Lead',
         required: [true, 'Lead ID is required'],
         index: true
     },
-    userId: { 
-        type: mongoose.Schema.Types.ObjectId, 
-        ref: 'User', 
+    userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
         required: [true, 'User ID is required'],
         index: true
     },
-    type: { 
-        type: String, 
+    type: {
+        type: String,
         enum: {
             values: ['Email', 'Call', 'Meeting', 'Note', 'Demo', 'Task', 'Status Change', 'Proposal Sent'],
             message: '{VALUE} is not a valid interaction type'
@@ -26,16 +33,16 @@ const interactionSchema = new mongoose.Schema({
         type: String,
         maxlength: [200, 'Title cannot exceed 200 characters']
     },
-    notes: { 
+    notes: {
         type: String,
         maxlength: [10000, 'Notes cannot exceed 10000 characters']
     },
-    aiSummary: { 
+    aiSummary: {
         type: String,
         maxlength: [2000, 'AI summary cannot exceed 2000 characters']
     },
-    sentiment: { 
-        type: String, 
+    sentiment: {
+        type: String,
         enum: {
             values: ['Positive', 'Neutral', 'Negative'],
             message: '{VALUE} is not a valid sentiment'
@@ -65,7 +72,7 @@ const interactionSchema = new mongoose.Schema({
         of: mongoose.Schema.Types.Mixed,
         default: {}
     }
-}, { 
+}, {
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true }
@@ -79,9 +86,12 @@ interactionSchema.virtual('formattedDuration').get(function() {
     return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 });
 
-// Indexes
-interactionSchema.index({ leadId: 1, createdAt: -1 });
-interactionSchema.index({ userId: 1, createdAt: -1 });
-interactionSchema.index({ type: 1, createdAt: -1 });
+// Indexes - All updated to include workspaceId for data isolation
+interactionSchema.index({ workspaceId: 1, leadId: 1, createdAt: -1 });
+interactionSchema.index({ workspaceId: 1, userId: 1, createdAt: -1 });
+interactionSchema.index({ workspaceId: 1, type: 1, createdAt: -1 });
+interactionSchema.index({ workspaceId: 1, leadId: 1, type: 1 }); // For filtering by type per lead
+interactionSchema.index({ workspaceId: 1, sentiment: 1, createdAt: -1 }); // For sentiment analysis
+interactionSchema.index({ workspaceId: 1, createdAt: -1 }); // For recent activity feeds
 
 export default mongoose.model('Interaction', interactionSchema);

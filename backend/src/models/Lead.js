@@ -1,27 +1,34 @@
 import mongoose from 'mongoose';
 
 const leadSchema = new mongoose.Schema({
-    userId: { 
-        type: mongoose.Schema.Types.ObjectId, 
-        ref: 'User', 
+    // Add workspaceId as the first field for data isolation
+    workspaceId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Workspace',
+        required: [true, 'Workspace ID is required'],
+        index: true
+    },
+    userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
         required: [true, 'User ID is required'],
         index: true
     },
-    name: { 
-        type: String, 
+    name: {
+        type: String,
         required: [true, 'Lead name is required'],
         trim: true,
         maxlength: [100, 'Name cannot exceed 100 characters']
     },
-    company: { 
-        type: String, 
+    company: {
+        type: String,
         required: [true, 'Company name is required'],
         trim: true,
         maxlength: [100, 'Company name cannot exceed 100 characters'],
         index: true
     },
-    email: { 
-        type: String, 
+    email: {
+        type: String,
         required: [true, 'Email is required'],
         trim: true,
         lowercase: true,
@@ -36,8 +43,8 @@ const leadSchema = new mongoose.Schema({
         match: [/^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/, 'Please provide a valid phone number'],
         default: null
     },
-    industry: { 
-        type: String, 
+    industry: {
+        type: String,
         required: [true, 'Industry is required'],
         trim: true,
         index: true
@@ -51,18 +58,18 @@ const leadSchema = new mongoose.Schema({
         default: 'New Lead',
         index: true
     },
-    leadScore: { 
-        type: Number, 
+    leadScore: {
+        type: Number,
         min: [0, 'Lead score cannot be less than 0'],
         max: [100, 'Lead score cannot exceed 100'],
         default: 0
     },
-    value: { 
+    value: {
         type: Number,
         min: [0, 'Deal value cannot be negative'],
         default: 0
     },
-    notes: { 
+    notes: {
         type: String,
         maxlength: [5000, 'Notes cannot exceed 5000 characters'],
         default: ''
@@ -93,7 +100,7 @@ const leadSchema = new mongoose.Schema({
         of: mongoose.Schema.Types.Mixed,
         default: {}
     }
-}, { 
+}, {
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true }
@@ -130,13 +137,16 @@ leadSchema.pre('save', function () {
     } else {
         this.priority = 'Low';
     }
-    
 });
 
 // Indexes for better query performance
-leadSchema.index({ userId: 1, status: 1 });
-leadSchema.index({ userId: 1, leadScore: -1 });
-leadSchema.index({ userId: 1, createdAt: -1 });
-leadSchema.index({ company: 'text', name: 'text' }); // For text search
+leadSchema.index({ workspaceId: 1, userId: 1, status: 1 });  // Added workspaceId
+leadSchema.index({ workspaceId: 1, userId: 1, leadScore: -1 });
+leadSchema.index({ workspaceId: 1, userId: 1, createdAt: -1 });
+leadSchema.index({ workspaceId: 1, company: 'text', name: 'text' }); // For text search with workspace isolation
+
+// Compound index for workspace-based queries (most important)
+leadSchema.index({ workspaceId: 1, status: 1, leadScore: -1 });
+leadSchema.index({ workspaceId: 1, userId: 1 });
 
 export default mongoose.model('Lead', leadSchema);

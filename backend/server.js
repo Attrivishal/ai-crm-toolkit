@@ -18,6 +18,7 @@ import leadRoutes from './src/routes/leads.js';
 import aiRoutes from './src/routes/ai.js';
 import taskRoutes from './src/routes/tasks.js';
 import interactionRoutes from './src/routes/interactions.js';
+import workspaceRoutes from './src/routes/workspaces.js';
 import './src/config/passport.js'; // This now has access to process.env
 
 const __filename = fileURLToPath(import.meta.url);
@@ -47,7 +48,7 @@ const corsOptions = {
             'http://127.0.0.1:5173',
             'http://127.0.0.1:3000'
         ];
-        
+
         if (!origin || allowedOrigins.indexOf(origin) !== -1 || isDevelopment) {
             callback(null, true);
         } else {
@@ -57,7 +58,7 @@ const corsOptions = {
     credentials: true,
     optionsSuccessStatus: 200,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-workspace-id']
 };
 
 app.use(cors(corsOptions));
@@ -189,7 +190,7 @@ app.use(passport.initialize());
 const connectDB = async () => {
     try {
         const mongoUri = process.env.MONGO_URI;
-        
+
         if (!mongoUri) {
             throw new Error('MONGO_URI is not defined in environment variables');
         }
@@ -205,10 +206,10 @@ const connectDB = async () => {
         };
 
         const conn = await mongoose.connect(mongoUri, mongooseOptions);
-        
+
         console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
         console.log(`📊 Database: ${conn.connection.name}`);
-        
+
         mongoose.connection.on('error', (err) => {
             console.error('❌ MongoDB connection error:', err);
         });
@@ -233,7 +234,7 @@ const connectDB = async () => {
     } catch (err) {
         console.error('❌ MongoDB connection error:', err.message);
         console.warn('⚠️ Server will continue running but database features will be unavailable');
-        
+
         if (isProduction) {
             console.error('❌ Exiting due to database connection failure in production');
             process.exit(1);
@@ -273,7 +274,8 @@ app.get('/api/health', (req, res) => {
         services: {
             ai: process.env.OPENAI_API_KEY ? 'configured' : 'not configured',
             googleOAuth: process.env.GOOGLE_CLIENT_ID ? 'configured' : 'not configured',
-            githubOAuth: process.env.GITHUB_CLIENT_ID ? 'configured' : 'not configured'
+            githubOAuth: process.env.GITHUB_CLIENT_ID ? 'configured' : 'not configured',
+            workspace: 'enabled'
         }
     });
 });
@@ -281,16 +283,16 @@ app.get('/api/health', (req, res) => {
 // Detailed health check
 app.get('/api/health/detailed', async (req, res) => {
     const isConnected = mongoose.connection.readyState === 1;
-    
+
     if (!isConnected) {
         return res.status(503).json({ success: false, message: 'Database disconnected' });
     }
 
     try {
         await mongoose.connection.db.admin().ping();
-        
+
         const stats = await mongoose.connection.db.stats();
-        
+
         res.json({
             success: true,
             timestamp: new Date().toISOString(),
@@ -384,6 +386,7 @@ app.use('/api/leads', leadRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/interactions', interactionRoutes);
+app.use('/api/workspaces', workspaceRoutes);
 
 // ==================== 404 HANDLER ====================
 
@@ -487,7 +490,7 @@ app.use((err, req, res, next) => {
 
 const gracefulShutdown = async (signal) => {
     console.log(`\n${signal} received. Starting graceful shutdown...`);
-    
+
     const forceShutdown = setTimeout(() => {
         console.error('Could not close connections in time, forcefully shutting down');
         process.exit(1);
@@ -530,6 +533,7 @@ const server = app.listen(PORT, () => {
     console.log(`🚀 Client URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
     console.log(`🚀 Health check: http://localhost:${PORT}/api/health`);
     console.log(`🚀 OAuth: Google ${process.env.GOOGLE_CLIENT_ID ? '✅' : '❌'} | GitHub ${process.env.GITHUB_CLIENT_ID ? '✅' : '❌'}`);
+    console.log(`🚀 Workspace: ✅ Enabled`);
     console.log(`🚀 ==================================\n`);
 });
 
