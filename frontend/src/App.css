@@ -17,6 +17,7 @@ html {
   outline-offset: 2px;
 }
 
+
 /* Print styles */
 @media print {
   .no-print {
