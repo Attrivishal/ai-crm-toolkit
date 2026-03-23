@@ -42,7 +42,6 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import { useWorkspace } from '../../contexts/workspace/useWorkspace'; // ← ADD THIS
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -83,6 +82,7 @@ import { getInitials } from '../../lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import NProgress from 'nprogress';
 import 'nprogress/nprogress.css';
+import { workspaceApi, type Workspace } from '../../lib/api';
 
 interface NavItem {
   to: string;
@@ -153,54 +153,111 @@ const SidebarItem = ({ item, collapsed }: { item: NavItem; collapsed: boolean })
   );
 };
 
-// Workspace Switcher Component (Now with Real Data)
+// Workspace Switcher Component - Simplified without useWorkspace
 const WorkspaceSwitcher = ({ collapsed }: { collapsed: boolean }) => {
   const [open, setOpen] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
-  const { workspaces, currentWorkspace, switchWorkspace, createWorkspace } = useWorkspace();
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch workspaces on mount
+  useEffect(() => {
+    const fetchWorkspaces = async () => {
+      try {
+        setIsLoading(true);
+        const { data } = await workspaceApi.getWorkspaces();
+        setWorkspaces(data.workspaces || []);
+        
+        // Set current workspace from localStorage or default to first
+        const savedWorkspaceId = localStorage.getItem('currentWorkspaceId');
+        if (savedWorkspaceId && data.workspaces?.length) {
+          const found = data.workspaces.find((w: Workspace) => w.id === savedWorkspaceId);
+          if (found) {
+            setCurrentWorkspace(found);
+          } else if (data.workspaces.length > 0) {
+            setCurrentWorkspace(data.workspaces[0]);
+            localStorage.setItem('currentWorkspaceId', data.workspaces[0].id);
+          }
+        } else if (data.workspaces?.length > 0) {
+          setCurrentWorkspace(data.workspaces[0]);
+          localStorage.setItem('currentWorkspaceId', data.workspaces[0].id);
+        }
+      } catch (error) {
+        console.error('Failed to fetch workspaces:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchWorkspaces();
+  }, []);
 
   const handleCreateWorkspace = async () => {
     if (newWorkspaceName.trim()) {
-      await createWorkspace(newWorkspaceName);
-      setNewWorkspaceName('');
-      setShowCreateDialog(false);
+      try {
+        const { data } = await workspaceApi.createWorkspace({ name: newWorkspaceName });
+        const newWorkspace = data.workspace;
+        setWorkspaces([...workspaces, newWorkspace]);
+        setCurrentWorkspace(newWorkspace);
+        localStorage.setItem('currentWorkspaceId', newWorkspace.id);
+        setNewWorkspaceName('');
+        setShowCreateDialog(false);
+      } catch (error) {
+        console.error('Failed to create workspace:', error);
+      }
     }
   };
 
   const handleSwitchWorkspace = async (workspaceId: string) => {
-    await switchWorkspace(workspaceId);
-    setOpen(false);
+    const workspace = workspaces.find(w => w.id === workspaceId);
+    if (workspace) {
+      setCurrentWorkspace(workspace);
+      localStorage.setItem('currentWorkspaceId', workspaceId);
+      setOpen(false);
+      // Reload page to refresh all data with new workspace
+      window.location.reload();
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="px-3 py-2 border-b border-border">
+        <div className="h-9 bg-muted rounded-lg animate-pulse" />
+      </div>
+    );
+  }
 
   if (collapsed) {
     return (
-      <div className="px-2 py-2 border-b border-border">
-        <DropdownMenu open={open} onOpenChange={setOpen}>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="w-full h-9">
-              <Briefcase className="w-4 h-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-48">
-            <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
-            {workspaces.map((ws) => (
-              <DropdownMenuItem
-                key={ws.id}
-                onClick={() => handleSwitchWorkspace(ws.id)}
-                className="flex items-center justify-between"
-              >
-                {ws.name}
-                {currentWorkspace?.id === ws.id && <CheckCircle2 className="w-3 h-3 text-primary" />}
+      <>
+        <div className="px-2 py-2 border-b border-border">
+          <DropdownMenu open={open} onOpenChange={setOpen}>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="w-full h-9">
+                <Briefcase className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-48">
+              <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
+              {workspaces.map((ws) => (
+                <DropdownMenuItem
+                  key={ws.id}
+                  onClick={() => handleSwitchWorkspace(ws.id)}
+                  className="flex items-center justify-between"
+                >
+                  {ws.name}
+                  {currentWorkspace?.id === ws.id && <CheckCircle2 className="w-3 h-3 text-primary" />}
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setShowCreateDialog(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Create Workspace
               </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => setShowCreateDialog(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Create Workspace
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
 
         {/* Create Workspace Dialog */}
         <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
@@ -229,43 +286,45 @@ const WorkspaceSwitcher = ({ collapsed }: { collapsed: boolean }) => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="px-3 py-2 border-b border-border">
-      <DropdownMenu open={open} onOpenChange={setOpen}>
-        <DropdownMenuTrigger className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-muted transition-colors">
-          <div className="flex items-center space-x-3">
-            <div className="w-6 h-6 bg-primary/10 rounded flex items-center justify-center">
-              <Briefcase className="w-3 h-3 text-primary" />
+    <>
+      <div className="px-3 py-2 border-b border-border">
+        <DropdownMenu open={open} onOpenChange={setOpen}>
+          <DropdownMenuTrigger className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-muted transition-colors">
+            <div className="flex items-center space-x-3">
+              <div className="w-6 h-6 bg-primary/10 rounded flex items-center justify-center">
+                <Briefcase className="w-3 h-3 text-primary" />
+              </div>
+              <span className="font-medium text-sm truncate max-w-[150px]">
+                {currentWorkspace?.name || 'Select Workspace'}
+              </span>
             </div>
-            <span className="font-medium text-sm">
-              {currentWorkspace?.name || 'Select Workspace'}
-            </span>
-          </div>
-          <ChevronDown className="w-4 h-4 text-muted-foreground" />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-56">
-          <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
-          {workspaces.map((ws) => (
-            <DropdownMenuItem
-              key={ws.id}
-              onClick={() => handleSwitchWorkspace(ws.id)}
-              className="flex items-center justify-between"
-            >
-              {ws.name}
-              {currentWorkspace?.id === ws.id && <CheckCircle2 className="w-3 h-3 text-primary" />}
+            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-56">
+            <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
+            {workspaces.map((ws) => (
+              <DropdownMenuItem
+                key={ws.id}
+                onClick={() => handleSwitchWorkspace(ws.id)}
+                className="flex items-center justify-between"
+              >
+                {ws.name}
+                {currentWorkspace?.id === ws.id && <CheckCircle2 className="w-3 h-3 text-primary" />}
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setShowCreateDialog(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Create Workspace
             </DropdownMenuItem>
-          ))}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setShowCreateDialog(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            Create Workspace
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
       {/* Create Workspace Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
@@ -294,7 +353,7 @@ const WorkspaceSwitcher = ({ collapsed }: { collapsed: boolean }) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 };
 
@@ -306,6 +365,16 @@ const ProfileSettingsDialog = ({ open, onOpenChange }: { open: boolean; onOpenCh
     email: user?.email || '',
     company: user?.company || '',
   });
+
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        name: user.name || '',
+        email: user.email || '',
+        company: user.company || '',
+      });
+    }
+  }, [user]);
 
   const handleSave = async () => {
     try {
@@ -339,6 +408,7 @@ const ProfileSettingsDialog = ({ open, onOpenChange }: { open: boolean; onOpenCh
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              disabled
             />
           </div>
           <div className="space-y-2">
@@ -438,7 +508,7 @@ const NotificationDrawer = () => {
   const [open, setOpen] = useState(false);
 
   const notifications = [
-    { id: 1, title: 'New lead assigned', description: 'Vishal Attri from Tech Innovations', time: '5m ago', icon: Users, color: 'blue' },
+    { id: 1, title: 'New lead assigned', description: 'New lead from Tech Innovations', time: '5m ago', icon: Users, color: 'blue' },
     { id: 2, title: 'AI analysis completed', description: 'Risk analysis for 3 deals ready', time: '1h ago', icon: Bot, color: 'purple' },
     { id: 3, title: 'Proposal viewed', description: 'Enterprise proposal was viewed', time: '2h ago', icon: FileText, color: 'green' },
     { id: 4, title: 'Deal at risk', description: 'High-value deal needs attention', time: '3h ago', icon: AlertCircle, color: 'red' },
@@ -538,10 +608,10 @@ const DashboardLayout = () => {
   const [showProfileDialog, setShowProfileDialog] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
-  const { workspaces, isLoading: workspacesLoading } = useWorkspace(); // Add this
 
   useEffect(() => {
     // NProgress for page transitions
@@ -562,6 +632,14 @@ const DashboardLayout = () => {
     setIsMobileMenuOpen(false);
   }, [location]);
 
+  useEffect(() => {
+    // Simulate loading workspaces check
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, []);
+
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
@@ -573,13 +651,13 @@ const DashboardLayout = () => {
     navigate('/login');
   };
 
-  // Show loading state while workspaces are loading
-  if (workspacesLoading) {
+  // Show loading state
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading your workspace...</p>
+          <p className="text-muted-foreground">Loading your dashboard...</p>
         </div>
       </div>
     );
