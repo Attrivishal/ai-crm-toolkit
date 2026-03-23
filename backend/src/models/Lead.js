@@ -1,13 +1,6 @@
 import mongoose from 'mongoose';
 
 const leadSchema = new mongoose.Schema({
-    // Add workspaceId as the first field for data isolation
-    workspaceId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Workspace',
-        required: [true, 'Workspace ID is required'],
-        index: true
-    },
     userId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
@@ -140,13 +133,9 @@ leadSchema.pre('save', function () {
 });
 
 // Indexes for better query performance
-leadSchema.index({ workspaceId: 1, userId: 1, status: 1 });  // Added workspaceId
-leadSchema.index({ workspaceId: 1, userId: 1, leadScore: -1 });
-leadSchema.index({ workspaceId: 1, userId: 1, createdAt: -1 });
-leadSchema.index({ workspaceId: 1, company: 'text', name: 'text' }); // For text search with workspace isolation
-
-// Compound index for workspace-based queries (most important)
-leadSchema.index({ workspaceId: 1, status: 1, leadScore: -1 });
-leadSchema.index({ workspaceId: 1, userId: 1 });
+leadSchema.index({ userId: 1, status: 1 });
+leadSchema.index({ userId: 1, leadScore: -1 });
+leadSchema.index({ userId: 1, createdAt: -1 });
+leadSchema.index({ company: 'text', name: 'text' }); // For text search
 
 export default mongoose.model('Lead', leadSchema);

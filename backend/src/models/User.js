@@ -46,28 +46,6 @@ const userSchema = new mongoose.Schema(
         maxlength: [100, 'Company name cannot exceed 100 characters']
     },
 
-    // ==================== WORKSPACE FIELDS ====================
-    workspaces: [{
-        workspace: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'Workspace'
-        },
-        role: {
-            type: String,
-            enum: ['owner', 'admin', 'member', 'viewer']
-        },
-        joinedAt: {
-            type: Date,
-            default: Date.now
-        }
-    }],
-
-    defaultWorkspace: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Workspace'
-    },
-    // ==================== END WORKSPACE FIELDS ====================
-
     avatar: {
         type: String,
         default: null
@@ -131,13 +109,6 @@ userSchema.virtual('leadsCount', {
     count: true
 });
 
-// Virtual: get user's workspaces with details
-userSchema.virtual('workspaceDetails', {
-    ref: 'Workspace',
-    localField: 'workspaces.workspace',
-    foreignField: '_id'
-});
-
 // ================= PASSWORD HASHING =================
 
 userSchema.pre('save', async function () {
@@ -150,62 +121,6 @@ userSchema.pre('save', async function () {
 
 userSchema.methods.comparePassword = function (enteredPassword) {
     return bcrypt.compare(enteredPassword, this.password);
-};
-
-// ================= WORKSPACE METHODS =================
-
-userSchema.methods.addWorkspace = function (workspaceId, role = 'member') {
-    // Check if already in workspace
-    const existing = this.workspaces.find(
-        w => w.workspace.toString() === workspaceId.toString()
-    );
-    
-    if (!existing) {
-        this.workspaces.push({
-            workspace: workspaceId,
-            role,
-            joinedAt: new Date()
-        });
-    }
-    
-    // Set as default if first workspace
-    if (this.workspaces.length === 1) {
-        this.defaultWorkspace = workspaceId;
-    }
-    
-    return this.save();
-};
-
-userSchema.methods.removeWorkspace = function (workspaceId) {
-    this.workspaces = this.workspaces.filter(
-        w => w.workspace.toString() !== workspaceId.toString()
-    );
-    
-    // Update default workspace if needed
-    if (this.defaultWorkspace?.toString() === workspaceId.toString()) {
-        this.defaultWorkspace = this.workspaces[0]?.workspace || null;
-    }
-    
-    return this.save();
-};
-
-userSchema.methods.updateWorkspaceRole = function (workspaceId, newRole) {
-    const workspace = this.workspaces.find(
-        w => w.workspace.toString() === workspaceId.toString()
-    );
-    
-    if (workspace) {
-        workspace.role = newRole;
-    }
-    
-    return this.save();
-};
-
-userSchema.methods.getWorkspaceRole = function (workspaceId) {
-    const workspace = this.workspaces.find(
-        w => w.workspace.toString() === workspaceId.toString()
-    );
-    return workspace?.role || null;
 };
 
 // ================= EMAIL VERIFICATION TOKEN =================
@@ -243,8 +158,6 @@ userSchema.methods.updateLastLogin = function () {
 
 userSchema.index({ role: 1 });
 userSchema.index({ company: 1 });
-userSchema.index({ 'workspaces.workspace': 1 }); // For workspace lookup
-userSchema.index({ defaultWorkspace: 1 }); // For default workspace
 
 // ================= EXPORT MODEL =================
 
