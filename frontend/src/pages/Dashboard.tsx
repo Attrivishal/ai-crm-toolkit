@@ -126,13 +126,18 @@ const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, per
 
 const Dashboard = () => {
   const { user } = useAuth();
+  
+  // Get workspace ID from localStorage (no useWorkspace hook needed)
+  const currentWorkspaceId = localStorage.getItem('currentWorkspaceId');
+  const [workspaceLoaded, setWorkspaceLoaded] = useState(true);
+  
   const [greeting, setGreeting] = useState("");
   const [timeOfDay, setTimeOfDay] = useState("");
   const [selectedTimeframe, setSelectedTimeframe] = useState("week");
 
-  // Fetch real leads data only
+  // Fetch real leads data only - removed workspaceId from params
   const { data: leadsData, isLoading: leadsLoading } = useQuery({
-    queryKey: ["leads-dashboard"],
+    queryKey: ["leads-dashboard", currentWorkspaceId],
     queryFn: async () => {
       try {
         const { data } = await leadsApi.getLeads({ limit: 100 });
@@ -145,10 +150,10 @@ const Dashboard = () => {
   });
 
   const { data: recentLeads, isLoading: recentLeadsLoading } = useQuery({
-    queryKey: ["recent-leads"],
+    queryKey: ["recent-leads", currentWorkspaceId],
     queryFn: async () => {
       try {
-        const { data } = await leadsApi.getLeads({
+        const { data } = await leadsApi.getLeads({ 
           limit: 5,
           sortBy: "createdAt",
           sortOrder: "desc",
@@ -180,7 +185,7 @@ const Dashboard = () => {
   const totalLeads = leads.length;
   
   // Safe calculations with fallbacks
-  const totalValue = leads?.reduce(
+  const totalValue = leads.reduce(
     (sum: number, lead: any) => sum + (lead.value || 0),
     0
   ) || 0;
@@ -225,11 +230,30 @@ const Dashboard = () => {
   });
 
   // Calculate additional metrics
-  const averageLeadScore = leads.reduce((acc, lead) => acc + (lead.leadScore || 0), 0) / totalLeads || 0;
+  const averageLeadScore = totalLeads > 0 
+    ? leads.reduce((acc, lead) => acc + (lead.leadScore || 0), 0) / totalLeads 
+    : 0;
   const highValueLeads = leads.filter((l: any) => l.value > 50000).length;
   const thisMonthValue = totalValue * 0.3; // Mock calculation
   const lastMonthValue = totalValue * 0.25; // Mock calculation
-  const growthRate = ((thisMonthValue - lastMonthValue) / lastMonthValue * 100).toFixed(1);
+  const growthRate = lastMonthValue > 0 
+    ? ((thisMonthValue - lastMonthValue) / lastMonthValue * 100).toFixed(1) 
+    : "0";
+
+  // Get median value safely
+  const getMedianValue = () => {
+    if (totalLeads === 0) return 0;
+    const sortedValues = leads.map(l => l.value).sort((a, b) => a - b);
+    return sortedValues[Math.floor(totalLeads / 2)] || 0;
+  };
+
+  // Get top opportunity safely
+  const getTopOpportunity = () => {
+    if (leads.length === 0) return null;
+    return [...leads].sort((a: any, b: any) => (b.value || 0) - (a.value || 0))[0];
+  };
+
+  const topOpportunity = getTopOpportunity();
 
   // Animation variants
   const containerVariants = {
@@ -254,7 +278,7 @@ const Dashboard = () => {
     },
   };
 
-  // Only check leads loading since we removed other APIs
+  // Only check leads loading
   if (leadsLoading || recentLeadsLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
@@ -378,7 +402,7 @@ const Dashboard = () => {
                 Active Leads
               </p>
               <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                {((activeLeads / totalLeads) * 100).toFixed(0)}% of total
+                {totalLeads > 0 ? ((activeLeads / totalLeads) * 100).toFixed(0) : 0}% of total
               </Badge>
             </div>
             <div className="flex items-center justify-between">
@@ -457,7 +481,7 @@ const Dashboard = () => {
               <div className="flex items-center justify-between text-xs mt-1">
                 <span className="text-muted-foreground">Median value</span>
                 <span className="font-medium">
-                  {formatCurrency(leads.map(l => l.value).sort((a,b) => a - b)[Math.floor(totalLeads/2)] || 0)}
+                  {formatCurrency(getMedianValue())}
                 </span>
               </div>
             </div>
@@ -759,14 +783,14 @@ const Dashboard = () => {
               <CardDescription>Real-time recommendations based on your data</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {leads.length > 0 ? (
+              {leads.length > 0 && topOpportunity ? (
                 <>
                   <div className="bg-white/80 backdrop-blur-sm p-4 rounded-xl border border-primary-100 shadow-sm hover:shadow-md transition-all cursor-pointer group">
                     <div className="flex items-start justify-between">
                       <div>
                         <h4 className="font-semibold text-sm">🏆 Top Opportunity</h4>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {leads.sort((a: any, b: any) => (b.value || 0) - (a.value || 0))[0]?.name} from {leads.sort((a: any, b: any) => (b.value || 0) - (a.value || 0))[0]?.company}
+                          {topOpportunity.name} from {topOpportunity.company}
                         </p>
                       </div>
                       <div className="bg-yellow-100 rounded-full p-1">
@@ -775,10 +799,10 @@ const Dashboard = () => {
                     </div>
                     <div className="mt-3 flex items-center justify-between">
                       <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                        {formatCurrency(leads.sort((a: any, b: any) => (b.value || 0) - (a.value || 0))[0]?.value || 0)}
+                        {formatCurrency(topOpportunity.value || 0)}
                       </Badge>
                       <Button variant="ghost" size="sm" className="text-xs text-primary-600" asChild>
-                        <Link to={`/leads/${leads.sort((a: any, b: any) => (b.value || 0) - (a.value || 0))[0]?._id}`}>
+                        <Link to={`/leads/${topOpportunity._id}`}>
                           View Lead
                           <ChevronRight className="w-3 h-3 ml-1" />
                         </Link>
@@ -902,7 +926,7 @@ const Dashboard = () => {
                 </Link>
               ))}
 
-              {recentLeads?.leads?.length === 0 && (
+              {(!recentLeads?.leads || recentLeads.leads.length === 0) && (
                 <div className="text-center py-8">
                   <Users className="w-12 h-12 text-muted-foreground/50 mx-auto mb-3" />
                   <p className="text-sm text-muted-foreground">No leads yet</p>
