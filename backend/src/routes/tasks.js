@@ -3,13 +3,11 @@ import { body, validationResult, param } from 'express-validator';
 import Task from '../models/Task.js';
 import Lead from '../models/Lead.js';
 import { protect } from '../middleware/auth.js';
-import { validateWorkspaceAccess } from '../middleware/workspace.js';  // ← ADD THIS
 
 const router = express.Router();
 
-// Apply authentication and workspace validation to all routes
+// Apply authentication to all routes
 router.use(protect);
-router.use(validateWorkspaceAccess);  // ← ADD THIS
 
 // @route   GET /api/tasks
 router.get('/', async (req, res) => {
@@ -25,9 +23,8 @@ router.get('/', async (req, res) => {
             sortOrder = 'asc'
         } = req.query;
 
-        // Build query with workspace isolation
+        // Build query
         const query = { 
-            workspaceId: req.workspaceId,  // ← ADD THIS
             userId: req.user._id 
         };
 
@@ -59,7 +56,6 @@ router.get('/', async (req, res) => {
         // Get counts by status
         const statusCounts = await Task.aggregate([
             { $match: { 
-                workspaceId: req.workspaceId,  // ← ADD THIS
                 userId: req.user._id 
             }},
             { $group: { _id: '$status', count: { $sum: 1 } } }
@@ -67,7 +63,6 @@ router.get('/', async (req, res) => {
 
         // Get overdue tasks count
         const overdueCount = await Task.countDocuments({
-            workspaceId: req.workspaceId,  // ← ADD THIS
             userId: req.user._id,
             status: { $nin: ['completed', 'cancelled'] },
             dueDate: { $lt: new Date() }
@@ -101,7 +96,6 @@ router.get('/', async (req, res) => {
 router.get('/overdue', async (req, res) => {
     try {
         const tasks = await Task.find({
-            workspaceId: req.workspaceId,  // ← ADD THIS
             userId: req.user._id,
             status: { $nin: ['completed', 'cancelled'] },
             dueDate: { $lt: new Date() }
@@ -133,7 +127,6 @@ router.get('/today', async (req, res) => {
         endOfDay.setHours(23, 59, 59, 999);
 
         const tasks = await Task.find({
-            workspaceId: req.workspaceId,  // ← ADD THIS
             userId: req.user._id,
             status: { $nin: ['completed', 'cancelled'] },
             dueDate: { $gte: startOfDay, $lte: endOfDay }
@@ -168,7 +161,6 @@ router.get('/upcoming', async (req, res) => {
         endDate.setHours(23, 59, 59, 999);
 
         const tasks = await Task.find({
-            workspaceId: req.workspaceId,  // ← ADD THIS
             userId: req.user._id,
             status: { $nin: ['completed', 'cancelled'] },
             dueDate: { $gte: startDate, $lte: endDate }
@@ -204,9 +196,9 @@ router.get('/:id', [
     }
 
     try {
-        const task = await Task.findOne({  // ← Use findOne instead of findById
+        const task = await Task.findOne({
             _id: req.params.id,
-            workspaceId: req.workspaceId  // ← ADD THIS
+            userId: req.user._id
         })
             .populate('leadId')
             .populate('assignedTo', 'name email');
@@ -215,14 +207,6 @@ router.get('/:id', [
             return res.status(404).json({
                 success: false,
                 message: 'Task not found'
-            });
-        }
-
-        // Check ownership
-        if (task.userId.toString() !== req.user._id.toString()) {
-            return res.status(401).json({
-                success: false,
-                message: 'Not authorized to view this task'
             });
         }
 
@@ -282,7 +266,6 @@ router.post('/', [
             if (leadId) {
                 const lead = await Lead.findOne({
                     _id: leadId,
-                    workspaceId: req.workspaceId,  // ← ADD THIS
                     userId: req.user._id
                 });
                 if (!lead) {
@@ -309,7 +292,6 @@ router.post('/', [
         const taskData = {
             ...req.body,
             userId: req.user._id,
-            workspaceId: req.workspaceId,  // ← ADD THIS
             source: 'Manual'
         };
 
@@ -379,23 +361,15 @@ router.put('/:id', [
     }
 
     try {
-        let task = await Task.findOne({  // ← Use findOne instead of findById
+        let task = await Task.findOne({
             _id: req.params.id,
-            workspaceId: req.workspaceId  // ← ADD THIS
+            userId: req.user._id
         });
 
         if (!task) {
             return res.status(404).json({
                 success: false,
                 message: 'Task not found'
-            });
-        }
-
-        // Check ownership
-        if (task.userId.toString() !== req.user._id.toString()) {
-            return res.status(401).json({
-                success: false,
-                message: 'Not authorized to update this task'
             });
         }
 
@@ -443,23 +417,15 @@ router.patch('/:id/status', [
     try {
         const { status } = req.body;
 
-        let task = await Task.findOne({  // ← Use findOne instead of findById
+        let task = await Task.findOne({
             _id: req.params.id,
-            workspaceId: req.workspaceId  // ← ADD THIS
+            userId: req.user._id
         });
 
         if (!task) {
             return res.status(404).json({
                 success: false,
                 message: 'Task not found'
-            });
-        }
-
-        // Check ownership
-        if (task.userId.toString() !== req.user._id.toString()) {
-            return res.status(401).json({
-                success: false,
-                message: 'Not authorized to update this task'
             });
         }
 
@@ -509,23 +475,15 @@ router.delete('/:id', [
     }
 
     try {
-        const task = await Task.findOne({  // ← Use findOne instead of findById
+        const task = await Task.findOne({
             _id: req.params.id,
-            workspaceId: req.workspaceId  // ← ADD THIS
+            userId: req.user._id
         });
 
         if (!task) {
             return res.status(404).json({
                 success: false,
                 message: 'Task not found'
-            });
-        }
-
-        // Check ownership
-        if (task.userId.toString() !== req.user._id.toString()) {
-            return res.status(401).json({
-                success: false,
-                message: 'Not authorized to delete this task'
             });
         }
 
@@ -549,23 +507,15 @@ router.post('/:id/duplicate', [
     param('id').isMongoId().withMessage('Invalid task ID')
 ], async (req, res) => {
     try {
-        const task = await Task.findOne({  // ← Use findOne instead of findById
+        const task = await Task.findOne({
             _id: req.params.id,
-            workspaceId: req.workspaceId  // ← ADD THIS
+            userId: req.user._id
         });
 
         if (!task) {
             return res.status(404).json({
                 success: false,
                 message: 'Task not found'
-            });
-        }
-
-        // Check ownership
-        if (task.userId.toString() !== req.user._id.toString()) {
-            return res.status(401).json({
-                success: false,
-                message: 'Not authorized to duplicate this task'
             });
         }
 
@@ -600,7 +550,6 @@ router.post('/:id/duplicate', [
 router.delete('/completed/clear', async (req, res) => {
     try {
         const result = await Task.deleteMany({
-            workspaceId: req.workspaceId,  // ← ADD THIS
             userId: req.user._id,
             status: 'completed'
         });
