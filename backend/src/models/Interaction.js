@@ -1,13 +1,6 @@
 import mongoose from 'mongoose';
 
 const interactionSchema = new mongoose.Schema({
-    // Add workspaceId as the first field for data isolation
-    workspaceId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Workspace',
-        required: [true, 'Workspace ID is required'],
-        index: true
-    },
     leadId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Lead',
@@ -86,12 +79,12 @@ interactionSchema.virtual('formattedDuration').get(function() {
     return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 });
 
-// Indexes - All updated to include workspaceId for data isolation
-interactionSchema.index({ workspaceId: 1, leadId: 1, createdAt: -1 });
-interactionSchema.index({ workspaceId: 1, userId: 1, createdAt: -1 });
-interactionSchema.index({ workspaceId: 1, type: 1, createdAt: -1 });
-interactionSchema.index({ workspaceId: 1, leadId: 1, type: 1 }); // For filtering by type per lead
-interactionSchema.index({ workspaceId: 1, sentiment: 1, createdAt: -1 }); // For sentiment analysis
-interactionSchema.index({ workspaceId: 1, createdAt: -1 }); // For recent activity feeds
+// Indexes for better query performance
+interactionSchema.index({ leadId: 1, createdAt: -1 });
+interactionSchema.index({ userId: 1, createdAt: -1 });
+interactionSchema.index({ type: 1, createdAt: -1 });
+interactionSchema.index({ leadId: 1, type: 1 }); // For filtering by type per lead
+interactionSchema.index({ sentiment: 1, createdAt: -1 }); // For sentiment analysis
+interactionSchema.index({ createdAt: -1 }); // For recent activity feeds
 
 export default mongoose.model('Interaction', interactionSchema);

@@ -1,13 +1,6 @@
 import mongoose from 'mongoose';
 
 const taskSchema = new mongoose.Schema({
-    // Add workspaceId as the first field for data isolation
-    workspaceId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Workspace',
-        required: [true, 'Workspace ID is required'],
-        index: true
-    },
     leadId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Lead',
@@ -112,12 +105,12 @@ taskSchema.pre('save', function(next) {
     next();
 });
 
-// Indexes - All updated to include workspaceId for data isolation
-taskSchema.index({ workspaceId: 1, userId: 1, status: 1 });
-taskSchema.index({ workspaceId: 1, userId: 1, dueDate: 1 });
-taskSchema.index({ workspaceId: 1, userId: 1, priority: -1 });
-taskSchema.index({ workspaceId: 1, leadId: 1, status: 1 });
-taskSchema.index({ workspaceId: 1, assignedTo: 1, status: 1 }); // For assigned tasks
-taskSchema.index({ workspaceId: 1, dueDate: 1, status: 1 }); // For overdue queries
+// Indexes for better query performance
+taskSchema.index({ userId: 1, status: 1 });
+taskSchema.index({ userId: 1, dueDate: 1 });
+taskSchema.index({ userId: 1, priority: -1 });
+taskSchema.index({ leadId: 1, status: 1 });
+taskSchema.index({ assignedTo: 1, status: 1 });
+taskSchema.index({ dueDate: 1, status: 1 }); // For overdue queries
 
 export default mongoose.model('Task', taskSchema);
