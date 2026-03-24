@@ -4,7 +4,6 @@ import jwt from 'jsonwebtoken';
 import passport from 'passport';
 import User from '../models/User.js';
 import RefreshToken from '../models/RefreshToken.js';
-import Workspace from '../models/Workspace.js';
 import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -42,34 +41,6 @@ const generateTokens = async (userId, userAgent, ipAddress) => {
     return { accessToken, refreshToken };
 };
 
-// Helper to create personal workspace for new user
-const createPersonalWorkspace = async (userId, userName) => {
-    try {
-        // Create personal workspace
-        const workspace = await Workspace.create({
-            name: `${userName}'s Workspace`,
-            owner: userId,
-            isPersonal: true,
-            members: [{
-                user: userId,
-                role: 'owner',
-                joinedAt: new Date()
-            }]
-        });
-
-        // Add workspace to user
-        await User.findByIdAndUpdate(userId, {
-            $push: { workspaces: { workspace: workspace._id, role: 'owner', joinedAt: new Date() } },
-            $set: { defaultWorkspace: workspace._id }
-        });
-
-        return workspace;
-    } catch (error) {
-        console.error('Error creating personal workspace:', error);
-        throw error;
-    }
-};
-
 // ==================== GOOGLE OAUTH ROUTES ====================
 
 // @route   GET /api/auth/google
@@ -103,12 +74,6 @@ router.get('/google/callback',
                 req.headers['user-agent'],
                 req.ip
             );
-
-            // Check if user has any workspaces, create personal if not
-            const userWithWorkspaces = await User.findById(user._id).populate('workspaces.workspace');
-            if (!userWithWorkspaces.workspaces || userWithWorkspaces.workspaces.length === 0) {
-                await createPersonalWorkspace(user._id, user.name);
-            }
 
             await user.updateLastLogin();
 
@@ -154,12 +119,6 @@ router.get('/github/callback',
                 req.headers['user-agent'],
                 req.ip
             );
-
-            // Check if user has any workspaces, create personal if not
-            const userWithWorkspaces = await User.findById(user._id).populate('workspaces.workspace');
-            if (!userWithWorkspaces.workspaces || userWithWorkspaces.workspaces.length === 0) {
-                await createPersonalWorkspace(user._id, user.name);
-            }
 
             await user.updateLastLogin();
 
@@ -241,8 +200,6 @@ router.post('/register', [
             req.ip
         );
 
-        // Create personal workspace for new user
-        await createPersonalWorkspace(user._id, user.name);
         await user.updateLastLogin();
 
         // Return user data (excluding sensitive info)
@@ -531,8 +488,7 @@ router.get('/me', protect, async (req, res) => {
         // Get user with additional stats
         const user = await User.findById(req.user._id)
             .select('-password')
-            .populate('leadsCount')
-            .populate('workspaces.workspace');
+            .populate('leadsCount');
 
         // Get active sessions count
         const activeSessions = await RefreshToken.countDocuments({
@@ -557,13 +513,7 @@ router.get('/me', protect, async (req, res) => {
                 stats: {
                     leadsCount: user.leadsCount || 0,
                     activeSessions
-                },
-                workspaces: user.workspaces ? user.workspaces.map(w => ({
-                    id: w.workspace._id,
-                    name: w.workspace.name,
-                    role: w.role,
-                    isPersonal: w.workspace.isPersonal
-                })) : []
+                }
             }
         });
     } catch (error) {
@@ -642,4 +592,3 @@ router.put('/me', protect, [
 });
 
 export default router;
-

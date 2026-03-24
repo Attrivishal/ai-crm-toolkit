@@ -5,23 +5,6 @@ import Interaction from '../models/Interaction.js';
 
 const router = express.Router();
 
-// COMMENTED OUT - OpenAI initialization
-// import { OpenAI } from 'openai';
-// const openai = new OpenAI({
-//     apiKey: process.env.OPENAI_API_KEY,
-// });
-
-// COMMENTED OUT - API key check middleware
-// const checkOpenAIKey = (req, res, next) => {
-//     if (!process.env.OPENAI_API_KEY) {
-//         return res.status(503).json({ 
-//             message: 'AI Service Unavailable', 
-//             error: 'OpenAI API key not configured. Please add your API key to use AI features.' 
-//         });
-//     }
-//     next();
-// };
-
 // Mock data generator functions
 const generateMockAnalysis = () => {
     const score = Math.floor(Math.random() * 40) + 60; // 60-100
@@ -296,9 +279,6 @@ const generateMockChatResponse = (messages, context) => {
 // Apply authentication to all routes
 router.use(protect);
 
-// REMOVED - OpenAI key check middleware
-// router.use(checkOpenAIKey);
-
 // @route   POST /api/ai/chat
 // @desc    AI chat with CRM context
 // @access  Private
@@ -332,12 +312,9 @@ router.post('/analyze-lead', async (req, res) => {
 
         // Verify lead exists and belongs to user
         if (leadId) {
-            const lead = await Lead.findById(leadId);
+            const lead = await Lead.findOne({ _id: leadId, userId: req.user._id });
             if (!lead) {
                 return res.status(404).json({ message: 'Lead not found' });
-            }
-            if (lead.userId.toString() !== req.user._id.toString()) {
-                return res.status(401).json({ message: 'Not authorized' });
             }
         }
 
@@ -346,7 +323,7 @@ router.post('/analyze-lead', async (req, res) => {
 
         // If leadId provided, update the lead with analysis
         if (leadId) {
-            await Lead.findByIdAndUpdate(leadId, {
+            await Lead.findOneAndUpdate({ _id: leadId, userId: req.user._id }, {
                 leadScore: analysis.leadScore,
                 aiAnalysis: analysis
             });
@@ -428,12 +405,9 @@ router.post('/deal-risk', async (req, res) => {
         }
 
         // Get lead with all interactions
-        const lead = await Lead.findById(leadId);
+        const lead = await Lead.findOne({ _id: leadId, userId: req.user._id });
         if (!lead) {
             return res.status(404).json({ message: 'Lead not found' });
-        }
-        if (lead.userId.toString() !== req.user._id.toString()) {
-            return res.status(401).json({ message: 'Not authorized' });
         }
 
         // Generate mock risk analysis
@@ -455,12 +429,9 @@ router.post('/generate-proposal', async (req, res) => {
             return res.status(400).json({ message: 'Lead ID is required' });
         }
 
-        const lead = await Lead.findById(leadId);
+        const lead = await Lead.findOne({ _id: leadId, userId: req.user._id });
         if (!lead) {
             return res.status(404).json({ message: 'Lead not found' });
-        }
-        if (lead.userId.toString() !== req.user._id.toString()) {
-            return res.status(401).json({ message: 'Not authorized' });
         }
 
         // Generate mock proposal
