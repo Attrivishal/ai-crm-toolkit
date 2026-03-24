@@ -3,13 +3,11 @@ import { body, validationResult } from 'express-validator';
 import Lead from '../models/Lead.js';
 import Interaction from '../models/Interaction.js';
 import { protect } from '../middleware/auth.js';
-import { validateWorkspaceAccess } from '../middleware/workspace.js';
 
 const router = express.Router();
 
-// Apply authentication and workspace validation to all routes
+// Apply authentication to all routes
 router.use(protect);
-router.use(validateWorkspaceAccess);
 
 // @route   GET /api/leads
 router.get('/', async (req, res) => {
@@ -18,13 +16,8 @@ router.get('/', async (req, res) => {
         const limit = parseInt(req.query.limit, 10) || 10;
         const startIndex = (page - 1) * limit;
 
-        // Build query - workspaceId is optional now
+        // Build query - only userId
         const query = { userId: req.user._id };
-        
-        // Add workspaceId to query if available
-        if (req.workspaceId) {
-            query.workspaceId = req.workspaceId;
-        }
 
         // Search functionality
         if (req.query.search) {
@@ -63,9 +56,6 @@ router.get('/', async (req, res) => {
         // Get interaction counts for each lead
         const leadsWithStats = await Promise.all(leads.map(async (lead) => {
             const interactionQuery = { leadId: lead._id };
-            if (req.workspaceId) {
-                interactionQuery.workspaceId = req.workspaceId;
-            }
             
             const interactionCount = await Interaction.countDocuments(interactionQuery);
             const lastInteraction = await Interaction.findOne(interactionQuery)
@@ -99,9 +89,6 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
     try {
         const query = { _id: req.params.id, userId: req.user._id };
-        if (req.workspaceId) {
-            query.workspaceId = req.workspaceId;
-        }
         
         const lead = await Lead.findOne(query);
         
@@ -110,12 +97,7 @@ router.get('/:id', async (req, res) => {
         }
 
         // Get interactions for this lead
-        const interactionQuery = { leadId: lead._id };
-        if (req.workspaceId) {
-            interactionQuery.workspaceId = req.workspaceId;
-        }
-        
-        const interactions = await Interaction.find(interactionQuery)
+        const interactions = await Interaction.find({ leadId: lead._id })
             .sort({ createdAt: -1 });
 
         res.json({
@@ -150,9 +132,6 @@ router.post('/', [
     try {
         // Check if lead already exists
         const query = { email: req.body.email, userId: req.user._id };
-        if (req.workspaceId) {
-            query.workspaceId = req.workspaceId;
-        }
         
         const existingLead = await Lead.findOne(query);
 
@@ -167,26 +146,16 @@ router.post('/', [
             userId: req.user._id,
             leadScore: 0
         };
-        
-        if (req.workspaceId) {
-            leadData.workspaceId = req.workspaceId;
-        }
 
         const lead = await Lead.create(leadData);
 
         // Create initial interaction
-        const interactionData = {
+        await Interaction.create({
             leadId: lead._id,
             userId: req.user._id,
             type: 'Note',
             notes: 'Lead created'
-        };
-        
-        if (req.workspaceId) {
-            interactionData.workspaceId = req.workspaceId;
-        }
-        
-        await Interaction.create(interactionData);
+        });
 
         res.status(201).json({ success: true, lead });
     } catch (error) {
@@ -199,9 +168,6 @@ router.post('/', [
 router.put('/:id', async (req, res) => {
     try {
         const query = { _id: req.params.id, userId: req.user._id };
-        if (req.workspaceId) {
-            query.workspaceId = req.workspaceId;
-        }
         
         let lead = await Lead.findOne(query);
         
@@ -210,7 +176,7 @@ router.put('/:id', async (req, res) => {
         }
 
         // Don't allow updating certain fields
-        const { userId, workspaceId, ...updateData } = req.body;
+        const { userId, ...updateData } = req.body;
 
         lead = await Lead.findByIdAndUpdate(
             req.params.id,
@@ -228,9 +194,6 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
     try {
         const query = { _id: req.params.id, userId: req.user._id };
-        if (req.workspaceId) {
-            query.workspaceId = req.workspaceId;
-        }
         
         const lead = await Lead.findOne(query);
         
@@ -239,12 +202,7 @@ router.delete('/:id', async (req, res) => {
         }
 
         // Delete all interactions first
-        const interactionQuery = { leadId: lead._id };
-        if (req.workspaceId) {
-            interactionQuery.workspaceId = req.workspaceId;
-        }
-        
-        await Interaction.deleteMany(interactionQuery);
+        await Interaction.deleteMany({ leadId: lead._id });
 
         // Then delete the lead
         await lead.deleteOne();
@@ -269,9 +227,6 @@ router.patch('/:id/status', async (req, res) => {
 
     try {
         const query = { _id: req.params.id, userId: req.user._id };
-        if (req.workspaceId) {
-            query.workspaceId = req.workspaceId;
-        }
         
         let lead = await Lead.findOne(query);
         
@@ -284,18 +239,12 @@ router.patch('/:id/status', async (req, res) => {
         await lead.save();
 
         // Create interaction for status change
-        const interactionData = {
+        await Interaction.create({
             leadId: lead._id,
             userId: req.user._id,
             type: 'Note',
             notes: `Status changed from ${oldStatus} to ${status}`
-        };
-        
-        if (req.workspaceId) {
-            interactionData.workspaceId = req.workspaceId;
-        }
-        
-        await Interaction.create(interactionData);
+        });
 
         res.json({ success: true, lead });
     } catch (error) {
@@ -307,9 +256,6 @@ router.patch('/:id/status', async (req, res) => {
 router.post('/:id/analyze', async (req, res) => {
     try {
         const query = { _id: req.params.id, userId: req.user._id };
-        if (req.workspaceId) {
-            query.workspaceId = req.workspaceId;
-        }
         
         const lead = await Lead.findOne(query);
         
@@ -328,8 +274,7 @@ router.post('/:id/analyze', async (req, res) => {
                 leadId: lead._id,
                 industry: lead.industry,
                 notes: lead.notes,
-                company: lead.company,
-                workspaceId: req.workspaceId
+                company: lead.company
             })
         });
 

@@ -3,7 +3,6 @@ import { body, validationResult, param, query } from 'express-validator';
 import Interaction from '../models/Interaction.js';
 import Lead from '../models/Lead.js';
 import { protect } from '../middleware/auth.js';
-import { validateWorkspaceAccess } from '../middleware/workspace.js';
 
 const router = express.Router();
 
@@ -40,7 +39,7 @@ router.get('/', [
         } = req.query;
 
         // Build query
-        const query = { workspaceId: req.workspaceId, userId: req.user._id };
+        const query = { userId: req.user._id };
         
         if (leadId) query.leadId = leadId;
         if (type) query.type = type;
@@ -70,7 +69,7 @@ router.get('/', [
 
         // Get summary statistics
         const stats = await Interaction.aggregate([
-            { $match: { workspaceId: req.workspaceId, userId: req.user._id } },
+            { $match: { userId: req.user._id } },
             { $group: {
                 _id: null,
                 totalInteractions: { $sum: 1 },
@@ -131,18 +130,11 @@ router.get('/lead/:leadId', [
         const { type, limit = 50 } = req.query;
 
         // Verify lead exists and belongs to user
-        const lead = await Lead.findOne({ workspaceId: req.workspaceId,  _id: leadId, workspaceId: req.workspaceId });
+        const lead = await Lead.findOne({ _id: leadId, userId: req.user._id });
         if (!lead) {
             return res.status(404).json({ 
                 success: false,
                 message: 'Lead not found' 
-            });
-        }
-        
-        if (lead.userId.toString() !== req.user._id.toString()) {
-            return res.status(401).json({ 
-                success: false,
-                message: 'Not authorized to view interactions for this lead' 
             });
         }
 
@@ -215,7 +207,7 @@ router.get('/:id', [
     }
 
     try {
-        const interaction = await Interaction.findOne({ _id: req.params.id, workspaceId: req.workspaceId })
+        const interaction = await Interaction.findOne({ _id: req.params.id, userId: req.user._id })
             .populate('leadId')
             .populate('userId', 'name email');
 
@@ -223,14 +215,6 @@ router.get('/:id', [
             return res.status(404).json({ 
                 success: false,
                 message: 'Interaction not found' 
-            });
-        }
-
-        // Check ownership
-        if (interaction.userId._id.toString() !== req.user._id.toString()) {
-            return res.status(401).json({ 
-                success: false,
-                message: 'Not authorized to view this interaction' 
             });
         }
 
@@ -254,7 +238,7 @@ router.post('/', [
         .isMongoId()
         .withMessage('Invalid lead ID')
         .custom(async (leadId, { req }) => {
-            const lead = await Lead.findOne({ workspaceId: req.workspaceId,  
+            const lead = await Lead.findOne({  
                 _id: leadId, 
                 userId: req.user._id 
             });
@@ -321,8 +305,8 @@ router.post('/', [
         // Populate lead data
         await interaction.populate('leadId', 'name company email');
 
-        // Update lead's last interaction date (you can add this field to Lead model if needed)
-        await Lead.findOneAndUpdate({ _id: req.body.leadId, workspaceId: req.workspaceId }, {
+        // Update lead's last interaction date
+        await Lead.findOneAndUpdate({ _id: req.body.leadId, userId: req.user._id }, {
             lastInteractionAt: new Date()
         });
 
@@ -387,20 +371,12 @@ router.put('/:id', [
     }
 
     try {
-        let interaction = await Interaction.findOne({ _id: req.params.id, workspaceId: req.workspaceId });
+        let interaction = await Interaction.findOne({ _id: req.params.id, userId: req.user._id });
         
         if (!interaction) {
             return res.status(404).json({ 
                 success: false,
                 message: 'Interaction not found' 
-            });
-        }
-
-        // Check ownership
-        if (interaction.userId.toString() !== req.user._id.toString()) {
-            return res.status(401).json({ 
-                success: false,
-                message: 'Not authorized to update this interaction' 
             });
         }
 
@@ -440,20 +416,12 @@ router.delete('/:id', [
     }
 
     try {
-        const interaction = await Interaction.findOne({ _id: req.params.id, workspaceId: req.workspaceId });
+        const interaction = await Interaction.findOne({ _id: req.params.id, userId: req.user._id });
         
         if (!interaction) {
             return res.status(404).json({ 
                 success: false,
                 message: 'Interaction not found' 
-            });
-        }
-
-        // Check ownership
-        if (interaction.userId.toString() !== req.user._id.toString()) {
-            return res.status(401).json({ 
-                success: false,
-                message: 'Not authorized to delete this interaction' 
             });
         }
 
@@ -480,23 +448,16 @@ router.get('/timeline/lead/:leadId', [
         const { leadId } = req.params;
 
         // Verify lead exists and belongs to user
-        const lead = await Lead.findOne({ workspaceId: req.workspaceId,  _id: leadId, workspaceId: req.workspaceId });
+        const lead = await Lead.findOne({ _id: leadId, userId: req.user._id });
         if (!lead) {
             return res.status(404).json({ 
                 success: false,
                 message: 'Lead not found' 
             });
         }
-        
-        if (lead.userId.toString() !== req.user._id.toString()) {
-            return res.status(401).json({ 
-                success: false,
-                message: 'Not authorized' 
-            });
-        }
 
         // Get all interactions and group by date
-        const interactions = await Interaction.find({ workspaceId: req.workspaceId,  
+        const interactions = await Interaction.find({  
             leadId,
             userId: req.user._id 
         })
