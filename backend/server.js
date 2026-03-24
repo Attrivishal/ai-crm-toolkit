@@ -18,7 +18,7 @@ import leadRoutes from './src/routes/leads.js';
 import aiRoutes from './src/routes/ai.js';
 import taskRoutes from './src/routes/tasks.js';
 import interactionRoutes from './src/routes/interactions.js';
-import workspaceRoutes from './src/routes/workspaces.js';
+// import workspaceRoutes from './src/routes/workspaces.js'; // REMOVED - No longer needed
 import './src/config/passport.js'; // This now has access to process.env
 
 const __filename = fileURLToPath(import.meta.url);
@@ -58,7 +58,8 @@ const corsOptions = {
     credentials: true,
     optionsSuccessStatus: 200,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-workspace-id']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+    // Removed 'x-workspace-id' from allowed headers
 };
 
 app.use(cors(corsOptions));
@@ -274,8 +275,8 @@ app.get('/api/health', (req, res) => {
         services: {
             ai: process.env.OPENAI_API_KEY ? 'configured' : 'not configured',
             googleOAuth: process.env.GOOGLE_CLIENT_ID ? 'configured' : 'not configured',
-            githubOAuth: process.env.GITHUB_CLIENT_ID ? 'configured' : 'not configured',
-            workspace: 'enabled'
+            githubOAuth: process.env.GITHUB_CLIENT_ID ? 'configured' : 'not configured'
+            // Removed workspace from services
         }
     });
 });
@@ -386,7 +387,7 @@ app.use('/api/leads', leadRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/interactions', interactionRoutes);
-app.use('/api/workspaces', workspaceRoutes);
+// app.use('/api/workspaces', workspaceRoutes); // REMOVED - Workspace routes no longer exist
 
 // ==================== 404 HANDLER ====================
 
@@ -533,7 +534,6 @@ const server = app.listen(PORT, () => {
     console.log(`🚀 Client URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
     console.log(`🚀 Health check: http://localhost:${PORT}/api/health`);
     console.log(`🚀 OAuth: Google ${process.env.GOOGLE_CLIENT_ID ? '✅' : '❌'} | GitHub ${process.env.GITHUB_CLIENT_ID ? '✅' : '❌'}`);
-    console.log(`🚀 Workspace: ✅ Enabled`);
     console.log(`🚀 ==================================\n`);
 });
 

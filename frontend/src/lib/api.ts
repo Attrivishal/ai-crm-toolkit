@@ -122,7 +122,7 @@ const api = axios.create({
   timeout: 30000,
 });
 
-// Request interceptor to add token and workspace ID
+// Request interceptor to add token only (workspace removed)
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('accessToken');
@@ -130,11 +130,7 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
     
-    // Add workspace ID header if available
-    const workspaceId = localStorage.getItem('currentWorkspaceId');
-    if (workspaceId) {
-      config.headers['X-Workspace-ID'] = workspaceId;
-    }
+    // Workspace header removed - no longer needed
     
     return config;
   },
@@ -326,74 +322,7 @@ export const aiApi = {
     api.post('/ai/generate-proposal', data),
 };
 
-// ==================== WORKSPACE API ====================
-
-export interface Workspace {
-  id: string;
-  name: string;
-  slug: string;
-  role: 'owner' | 'admin' | 'member' | 'viewer';
-  settings: {
-    currency: string;
-    timezone: string;
-  };
-  stats?: {
-    totalLeads: number;
-    totalValue: number;
-    activeMembers: number;
-  };
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface WorkspaceMember {
-  id: string;
-  email: string;
-  name: string;
-  role: 'owner' | 'admin' | 'member' | 'viewer';
-  joinedAt: string;
-  avatar?: string;
-}
-
-export const workspaceApi = {
-  // Get all workspaces for current user
-  getWorkspaces: () =>
-    api.get<{ success: boolean; workspaces: Workspace[] }>('/workspaces'),
-
-  // Get single workspace by ID
-  getWorkspace: (id: string) =>
-    api.get<{ success: boolean; workspace: Workspace }>(`/workspaces/${id}`),
-
-  // Create new workspace
-  createWorkspace: (data: { name: string }) =>
-    api.post<{ success: boolean; workspace: Workspace }>('/workspaces', data),
-
-  // Update workspace
-  updateWorkspace: (id: string, data: Partial<Workspace>) =>
-    api.put<{ success: boolean; workspace: Workspace }>(`/workspaces/${id}`, data),
-
-  // Delete workspace
-  deleteWorkspace: (id: string) =>
-    api.delete<{ success: boolean; message: string }>(`/workspaces/${id}`),
-
-  // Get workspace members
-  getMembers: (workspaceId: string) =>
-    api.get<{ success: boolean; members: WorkspaceMember[] }>(`/workspaces/${workspaceId}/members`),
-
-  // Add member to workspace
-  addMember: (workspaceId: string, data: { email: string; role: string }) =>
-    api.post<{ success: boolean; member: WorkspaceMember }>(`/workspaces/${workspaceId}/members`, data),
-
-  // Remove member from workspace
-  removeMember: (workspaceId: string, userId: string) =>
-    api.delete<{ success: boolean; message: string }>(`/workspaces/${workspaceId}/members/${userId}`),
-
-  // Update member role
-  updateMemberRole: (workspaceId: string, userId: string, role: string) =>
-    api.patch<{ success: boolean; member: WorkspaceMember }>(`/workspaces/${workspaceId}/members/${userId}`, { role }),
-};
-
-// OAuth helper function (optional but useful)
+// OAuth helper function
 export const oauthHelper = {
   // Get OAuth URL for provider
   getAuthUrl: (provider: 'google' | 'github') => {
