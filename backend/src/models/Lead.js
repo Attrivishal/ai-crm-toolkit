@@ -138,4 +138,5 @@ leadSchema.index({ userId: 1, leadScore: -1 });
 leadSchema.index({ userId: 1, createdAt: -1 });
 leadSchema.index({ company: 'text', name: 'text' }); // For text search
 
+
 export default mongoose.model('Lead', leadSchema);

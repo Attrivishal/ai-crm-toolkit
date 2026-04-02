@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-dotenv.config();  // ← MUST BE FIRST - Load environment variables before anything else!
+dotenv.config();  // It loads envirnment varables from .env 
 
 import express from 'express';
 import mongoose from 'mongoose';
