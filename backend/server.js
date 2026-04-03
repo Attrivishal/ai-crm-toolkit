@@ -137,25 +137,27 @@ app.use((req, res, next) => {
     next();
 });
 
+// Trust proxy (crucial for Nginx/CloudFront to see real user IPs)
+app.set('trust proxy', 1);
+
 // ==================== RATE LIMITING ====================
 
 // Global rate limiter
 const globalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: isProduction ? 100 : 200,
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: isProduction ? 200 : 500, // Increased for production
     message: {
         success: false,
         message: 'Too many requests from this IP, please try again later.'
     },
     standardHeaders: true,
     legacyHeaders: false,
-    skip: (req) => req.path === '/api/health'
 });
 
-// Auth rate limiter (stricter)
+// Authentication rate limiter
 const authLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000,
-    max: isProduction ? 10 : 20,
+    windowMs: 15 * 60 * 1000, // Reduced window to 15 mins
+    max: isProduction ? 20 : 50, // Increased max attempts
     message: {
         success: false,
         message: 'Too many authentication attempts, please try again later.'
