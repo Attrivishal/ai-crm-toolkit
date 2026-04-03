@@ -180,9 +180,9 @@ const aiLimiter = rateLimit({
         if (req.user?._id) {
             return req.user._id.toString();
         }
-        // Properly handle IPv6 addresses by using the built-in helper
-        return req.ip || req.socket.remoteAddress;
-    }
+        // Properly handle IPv6 addresses and avoid the express-rate-limit error
+        return req.ip;
+    },
 });
 
 // Apply rate limiting
