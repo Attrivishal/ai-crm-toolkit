@@ -120,7 +120,8 @@ const Copilot = () => {
   const chatMutation = useMutation({
     mutationFn: async (data: { messages: any[]; context: any }) => {
       // Call your AI API endpoint that connects to OpenAI/Claude/Llama
-      const response = await fetch('http://localhost:5001/api/ai/chat', {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+      const response = await fetch(`${API_URL}/ai/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

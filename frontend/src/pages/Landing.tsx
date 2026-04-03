@@ -156,8 +156,9 @@ const Landing = () => {
       if (!token) {
         try {
           console.log("No token found, logging in...");
+          const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
           const loginResponse = await fetch(
-            "http://localhost:5001/api/auth/login",
+            `${API_URL}/auth/login`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -185,7 +186,8 @@ const Landing = () => {
         throw new Error("No authentication token available");
       }
 
-      const response = await fetch("http://localhost:5001/api/leads", {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+      const response = await fetch(`${API_URL}/leads`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",

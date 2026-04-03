@@ -33,7 +33,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const error = params.get('error');
 
     if (error) {
-      // Handle OAuth error
       if (error === 'google_auth_failed') {
         toast.error('Google login failed. Please try again.');
       } else if (error === 'github_auth_failed') {
@@ -41,24 +40,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } else {
         toast.error('Authentication failed. Please try again.');
       }
-      // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
     }
 
     if (token) {
-      // Store tokens from OAuth
       localStorage.setItem('accessToken', token);
       if (refreshToken) {
         localStorage.setItem('refreshToken', refreshToken);
       }
-
-      // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
-
-      // Fetch user data
       fetchUserWithToken(token);
     } else {
-      // Normal auth check
       checkAuth();
     }
   }, [navigate]);
@@ -72,11 +64,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(data.user);
       toast.success('Successfully logged in!');
       
-      // Redirect to dashboard
       const redirectPath = '/dashboard';
       console.log('🔍 Redirecting to:', redirectPath);
-      
-      // Force redirect with window.location
       window.location.href = redirectPath;
     } catch (error) {
       console.error('Failed to fetch user after OAuth:', error);
@@ -138,17 +127,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const socialLogin = (provider: 'google' | 'github') => {
-    // Store the current path to return after OAuth
     localStorage.setItem('oauth_redirect', window.location.pathname);
-    
-    // Show loading toast
     toast.loading(`Redirecting to ${provider}...`, { 
       id: 'oauth-loading',
       duration: 5000 
     });
     
     // Redirect to backend OAuth endpoint
-    window.location.href = `http://localhost:5001/api/auth/${provider}`;
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+    window.location.href = `${API_URL}/auth/${provider}`;
   };
 
   const logout = async () => {

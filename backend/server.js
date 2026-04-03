@@ -43,13 +43,22 @@ app.use(helmet({
 const corsOptions = {
     origin: function (origin, callback) {
         const allowedOrigins = [
-            process.env.CLIENT_URL || 'http://localhost:5173',
+            process.env.CLIENT_URL,
+            'http://localhost:5173',
             'http://localhost:3000',
             'http://127.0.0.1:5173',
             'http://127.0.0.1:3000'
-        ];
+        ].filter(Boolean); // Remove undefined/null
 
-        if (!origin || allowedOrigins.indexOf(origin) !== -1 || isDevelopment) {
+        if (isProduction) {
+            // In production, strictly match CLIENT_URL
+            if (origin === process.env.CLIENT_URL) {
+                callback(null, true);
+            } else {
+                callback(new Error('CORS blocked: Origin not allowed for production'));
+            }
+        } else if (!origin || allowedOrigins.includes(origin) || isDevelopment) {
+            // In development or local, be more flexible
             callback(null, true);
         } else {
             callback(new Error('Not allowed by CORS'));
