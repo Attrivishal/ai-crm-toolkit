@@ -51,8 +51,8 @@ const corsOptions = {
         ].filter(Boolean); // Remove undefined/null
 
         if (isProduction) {
-            // In production, strictly match CLIENT_URL
-            if (origin === process.env.CLIENT_URL) {
+            // In production, strictly match CLIENT_URL, but allow local health checks
+            if (origin === process.env.CLIENT_URL || !origin) {
                 callback(null, true);
             } else {
                 callback(new Error('CORS blocked: Origin not allowed for production'));
@@ -175,14 +175,6 @@ const aiLimiter = rateLimit({
     },
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: (req) => {
-        // Use user ID if authenticated
-        if (req.user?._id) {
-            return req.user._id.toString();
-        }
-        // Properly handle IPv6 addresses and avoid the express-rate-limit error
-        return req.ip;
-    },
 });
 
 // Apply rate limiting
