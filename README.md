@@ -1,4 +1,4 @@
-# PipelineIQ - AI Sales Assistant 🚀📈
+# PipelineIQ - AI Sales Assistant 
 
 **PipelineIQ** (formerly SalesMind) is a professional, production-ready MERN stack application designed to supercharge sales workflows with AI-driven lead management and insights.
 
