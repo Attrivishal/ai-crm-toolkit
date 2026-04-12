@@ -58,7 +58,6 @@ cd ../frontend
 npm install
 npm run dev
 ```
-
 ---
 
 ## 🏗️ Production Deployment Architecture
