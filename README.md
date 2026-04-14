@@ -10,6 +10,7 @@
 
 ---
 
+
 ## ✨ Features
 - **AI Sales Copilot**: Intelligent AI assistant to help draft outreach and analyze deals.
 - **Lead Management**: Organize and track leads with a sleek, interactive dashboard.
